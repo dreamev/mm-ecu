@@ -93,33 +93,42 @@ class PadButton:
         if color == COLOR_RED:
             print("changing color red")
             self.red = 1
+            self.green = 0
+            self.blue = 0
         elif color == COLOR_BLUE:
             print("changing color blue")
+            self.red = 0
+            self.green = 0
             self.blue = 1
         elif color == COLOR_GREEN:
             print("changing color green")
+            self.red = 0
             self.green = 1
+            self.blue = 0
         elif color == COLOR_MAGENTA:
             print("changing color magenta")
             self.red = 1
+            self.green = 0
             self.blue = 1
         elif color == COLOR_CYAN:
             print("changing color cyan")
+            self.red = 0
+            self.green = 1
             self.blue = 1
-            self.green = 1
         elif color == COLOR_YELLOW:
-            self.green = 1
             self.red = 1
+            self.green = 1
+            self.blue = 0
         elif color == COLOR_WHITE:
             print("changing color white")
             self.red = 1
+            self.green = 1
             self.blue = 1
-            self.red = 1
         elif color == COLOR_BLACK:
             print("changing color black")
             self.red = 0
+            self.green = 0
             self.blue = 0
-            self.red = 0
 
         return self
 
