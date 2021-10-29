@@ -91,7 +91,6 @@ class PadButton:
 
     def change_color(self, color):
         if color == COLOR_RED:
-            print("changing color red")
             self.red = 1
             self.green = 0
             self.blue = 0
