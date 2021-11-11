@@ -56,6 +56,35 @@ COLOR_CYAN = 105
 COLOR_WHITE = 106
 COLOR_BLACK = 107
 
+# Used ECU controller Process button presses
+BUTTON_HAZARD = 0
+BUTTON_PARK = 1
+BUTTON_REVERSE = 2
+BUTTON_NEUTRAL = 3
+BUTTON_DRIVE = 4
+BUTTON_AUTOPILOT_SPEED_UP = 5
+BUTTON_EXHAUST_SOUND = 6
+BUTTON_F1 = 7
+BUTTON_F2 = 8
+BUTTON_REGEN = 9
+BUTTON_AUTOPILOT_ON = 10
+BUTTON_AUTOPILOT_SPEED_DOWN = 11
+
+# Used ECU Controller 
+# Pressed Button values need to be refactored
+BUTTON_PRESSED_HAZARD = -1
+BUTTON_PRESSED_PARK = -2
+BUTTON_PRESSED_REVERSE = -3
+BUTTON_PRESSED_NEUTRAL = -4
+BUTTON_PRESSED_DRIVE = -5
+BUTTON_PRESSED_AUTOPILOT_SPEED_UP = -6
+BUTTON_PRESSED_EXHAUST_SOUND = -7
+BUTTON_PRESSED_F1 = -8
+BUTTON_PRESSED_F2 = -9
+BUTTON_PRESSED_REGEN = -10
+BUTTON_PRESSED_AUTOPILOT_ON = -11
+BUTTON_PRESSED_AUTOPILOT_SPEED_DOWN = -12
+
 WARNING = False
 
 class Logger:
@@ -81,6 +110,7 @@ class CanMessage:
 
     def message(self):
         return canio.Message(id=self.id, data=self.data)
+
 
 class PadButton:
     def __init__(self, id):
@@ -138,32 +168,32 @@ class ControlPadView:
     def __init__(self, can):
         self.can = can
         self.buttons = [
-            PadButton(0), 
-            PadButton(1), 
-            PadButton(2), 
-            PadButton(3), 
-            PadButton(4), 
-            PadButton(5), 
-            PadButton(6), 
-            PadButton(7), 
-            PadButton(8),
-            PadButton(9), 
-            PadButton(10), 
-            PadButton(11), 
-            PadButton(12),
+            PadButton(BUTTON_HAZARD), 
+            PadButton(BUTTON_PARK), 
+            PadButton(BUTTON_REVERSE),
+            PadButton(BUTTON_NEUTRAL), 
+            PadButton(BUTTON_DRIVE), 
+            PadButton(BUTTON_AUTOPILOT_SPEED_UP), 
+            PadButton(BUTTON_EXHAUST_SOUND), 
+            PadButton(BUTTON_F1), 
+            PadButton(BUTTON_F2),
+            PadButton(BUTTON_REGEN), 
+            PadButton(BUTTON_AUTOPILOT_ON), 
+            PadButton(BUTTON_AUTOPILOT_SPEED_DOWN),
         ]
 
-    def update_color(self, id, color):
-        self.buttons[id].change_color(color)
+    def update_color(self, index, color):
+        print("updating color for ", index)
+        self.buttons[index].change_color(color)
         self.refresh_button_colors()
 
     def refresh_button_colors(self):
         pad_matrix = self.rgb_matrices()
         payload = self.rgb_matrix_to_hex(pad_matrix)
         print(payload)
-        # cm = CanMessage(0x215, payload)
-        # message = cm.message()
-        # self.can.send(message)
+        cm = CanMessage(0x215, payload)
+        message = cm.message()
+        self.can.send(message)
 
     def rgb_matrices(self):
         i = 0
@@ -196,27 +226,33 @@ class ControlPadView:
         b4 = [0] * 4 + br[:4]
 
         # Convert list to binary
-        bb0 = bin(int(''.join(map(str, b0)), 2) << 1)
-        bb1 = bin(int(''.join(map(str, b1)), 2) << 1)
-        bb2 = bin(int(''.join(map(str, b2)), 2) << 1)
-        bb3 = bin(int(''.join(map(str, b3)), 2) << 1)
-        bb4 = bin(int(''.join(map(str, b4)), 2) << 1)
+        bb0 = bin(int(''.join(map(str, b0)), 2))
+        bb1 = bin(int(''.join(map(str, b1)), 2))
+        bb2 = bin(int(''.join(map(str, b2)), 2))
+        bb3 = bin(int(''.join(map(str, b3)), 2))
+        bb4 = bin(int(''.join(map(str, b4)), 2))
 
         # Convert each binary value to hex
-        h0 = hex(int(bb0, 2))
-        h1 = hex(int(bb1, 2))
-        h2 = hex(int(bb2, 2))
-        h3 = hex(int(bb3, 2))
-        h4 = hex(int(bb4, 2))
+        h0 = int(bb0, 2)
+        h1 = int(bb1, 2)
+        h2 = int(bb2, 2)
+        h3 = int(bb3, 2)
+        h4 = int(bb4, 2)
         # print("rr: ", rr)
         # print("gr: ", gr)
         # print("br: ", br)
+        # print("binary byte 4: ", bb4)
+        # print("binary byte 3: ", bb3)
+        # print("binary byte 2: ", bb2)
+        # print("binary byte 1: ", bb1)
+        # print("binary byte 0: ", bb0)
         # print("byte 4: ", b4)
         # print("byte 3: ", b3)
         # print("byte 2: ", b2)
         # print("byte 1: ", b1)
         # print("byte 0: ", b0)
-        print(type(h0))
+        # return [h0, h1, h2, h3, h4]
+        # return [1, 16, 0, 0, 0]
         return [h0, h1, h2, h3, h4]
     
 
@@ -225,33 +261,136 @@ class ECUController:
         self.ecu = ecu
         self.pad = pad
 
-    def process_hazard_button_press(self):
+    def process_button_pressed(self, index):
+        print("in process_button_pressed %i", index)
+        if index == BUTTON_HAZARD:
+            self.process_button_pressed_hazard()
+        if index == BUTTON_PARK:
+            self.process_button_pressed_park()
+        if index == BUTTON_REVERSE:
+            self.process_button_pressed_reverse()
+        if index == BUTTON_NEUTRAL:
+            self.process_button_pressed_neutral()
+        if index == BUTTON_DRIVE:
+            self.process_button_pressed_drive()
+        if index == BUTTON_AUTOPILOT_SPEED_UP:
+            self.process_button_pressed_autopilot_speed_up()
+        if index == BUTTON_EXHAUST_SOUND:
+            self.process_button_pressed_exhaust_sound()
+        if index == BUTTON_F1:
+            self.process_button_pressed_f1()
+        if index == BUTTON_F2:
+            self.process_button_pressed_f2()
+        if index == BUTTON_REGEN :
+            self.process_button_pressed_regen()
+        if index == BUTTON_AUTOPILOT_ON :
+            self.process_button_pressed_autopilot_on()
+        if index == BUTTON_AUTOPILOT_SPEED_DOWN :
+            self.process_button_pressed_autopilot_speed_down()
+
+    def process_button_pressed_hazard(self):
+        print("PROCESSING HAZARD BUTTON PRESS")
+
         if self.ecu.hazard == DISABLED:
             self.ecu.set_hazard_lights(ENABLED)
-            self.pad.update_color(0, COLOR_YELLOW)
+            self.pad.update_color(BUTTON_HAZARD, COLOR_YELLOW)
         else:
             self.ecu.set_hazard_lights(DISABLED)
-            turn_off_all_lights()            
-            # self.pad.update_color(0, COLOR_BLACK)
+            self.pad.update_color(BUTTON_HAZARD, COLOR_BLACK)
 
-    def process_exhaust_sound_button_press(self):
-        if self.ecu.exhaust_sound == DISABLED:
-            self.ecu.set_exhaust_sound(ENABLED)
-        else:
-            self.ecu.set_exhaust_sound(DISABLED)
-
-    def process_regen_button_press(self):
-        if self.ecu.exhaust_sound == DISABLED:
-            self.ecu.set_exhaust_sound(ENABLED)
-        else:
-            self.ecu.set_exhaust_sound(DISABLED)
-
-    def process_drive_state_press(self, request):
+    def process_button_pressed_park(self):
+        print("PROCESSING PARK BUTTON PRESS")
         current_state = self.ecu.drive_state
-        future_state = request
+        future_state = PARK
 
         if current_state != future_state:
             self.ecu.set_drive_state(future_state)
+            self.pad.update_color(BUTTON_PARK, COLOR_BLUE)
+            self.pad.update_color(BUTTON_REVERSE, COLOR_BLACK)
+            self.pad.update_color(BUTTON_NEUTRAL, COLOR_BLACK)
+            self.pad.update_color(BUTTON_DRIVE, COLOR_BLACK)
+
+    def process_button_pressed_reverse(self):
+        print("PROCESSING REVERSE BUTTON PRESS")
+        current_state = self.ecu.drive_state
+        future_state = REVERSE
+
+        if current_state != future_state:
+            self.ecu.set_drive_state(future_state)
+            self.pad.update_color(BUTTON_PARK, COLOR_BLACK)
+            self.pad.update_color(BUTTON_REVERSE, COLOR_RED)
+            self.pad.update_color(BUTTON_NEUTRAL, COLOR_BLACK)
+            self.pad.update_color(BUTTON_DRIVE, COLOR_BLACK)
+
+    def process_button_pressed_neutral(self):
+        print("PROCESSING NEUTRAL BUTTON PRESS")
+        current_state = self.ecu.drive_state
+        future_state = NEUTRAL
+
+        if current_state != future_state:
+            self.ecu.set_drive_state(future_state)
+            self.pad.update_color(BUTTON_PARK, COLOR_BLACK)
+            self.pad.update_color(BUTTON_REVERSE, COLOR_BLACK)
+            self.pad.update_color(BUTTON_NEUTRAL, COLOR_YELLOW)
+            self.pad.update_color(BUTTON_DRIVE, COLOR_BLACK)
+        
+    def process_button_pressed_drive(self):
+        print("PROCESSING DRIVE BUTTON PRESS")
+        current_state = self.ecu.drive_state
+        future_state = DRIVE
+
+        if current_state != future_state:
+            self.ecu.set_drive_state(future_state)
+            self.pad.update_color(BUTTON_PARK, COLOR_BLACK)
+            self.pad.update_color(BUTTON_REVERSE, COLOR_BLACK)
+            self.pad.update_color(BUTTON_NEUTRAL, COLOR_BLACK)
+            self.pad.update_color(BUTTON_DRIVE, COLOR_GREEN)
+
+        
+    def process_button_pressed_autopilot_speed_up(self):
+        print("PROCESSING AUTOPILOT_SPEED_UP BUTTON PRESS")
+        
+    def process_button_pressed_exhaust_sound(self):
+        print("PROCESSING EXHAUST_SOUND BUTTON PRESS")
+        if self.ecu.exhaust_sound == DISABLED:
+            self.ecu.set_exhaust_sound(ENABLED)
+            self.pad.update_color(BUTTON_EXHAUST_SOUND, COLOR_YELLOW)
+        else:
+            self.ecu.set_exhaust_sound(DISABLED)
+            self.pad.update_color(BUTTON_EXHAUST_SOUND, COLOR_BLACK)
+        
+    # Paired with F2 only one or the other active at once
+    def process_button_pressed_f1(self):
+        print("PROCESSING F1 BUTTON PRESS")
+        if self.ecu.f1 == DISABLED:
+            self.ecu.set_f1(ENABLED)
+            self.pad.update_color(BUTTON_F1, COLOR_CYAN)
+            self.ecu.set_f2(DISABLED)
+            self.pad.update_color(BUTTON_F2, COLOR_BLACK)
+        
+    def process_button_pressed_f2(self):
+        print("PROCESSING F2 BUTTON PRESS")
+        if self.ecu.f2 == DISABLED:
+            self.ecu.set_f2(ENABLED)
+            self.pad.update_color(BUTTON_F2, COLOR_YELLOW)
+            self.ecu.set_f1(DISABLED)
+            self.pad.update_color(BUTTON_F1, COLOR_BLACK)
+        
+    def process_button_pressed_regen(self):
+        print("PROCESSING REGEN BUTTON PRESS")
+
+        if self.ecu.regen_state == ENABLED:
+            self.ecu.set_regen_state(DISABLED)
+            self.pad.update_color(BUTTON_REGEN, COLOR_BLACK)
+        else:
+            self.ecu.set_regen_state(ENABLED)
+            self.pad.update_color(BUTTON_REGEN, COLOR_YELLOW)
+        
+    def process_button_pressed_autopilot_on(self):
+        print("PROCESSING AUTOPILOT_ON BUTTON PRESS")
+
+    def process_button_pressed_autopilot_speed_down(self):
+        print("PROCESSING AUTOPILOT_SPEED_DOWN BUTTON PRESS")
 
 
 class ECU:
@@ -263,6 +402,8 @@ class ECU:
         self.regen_state = ENABLED
         self.cruise_state = DISABLED
         self.target_cruise_speed = 0
+        self.f1 = DISABLED
+        self.f2 = DISABLED
 
     def save_state(self):
         True
@@ -270,11 +411,21 @@ class ECU:
     def load_state(self, file):
         True
 
+    def set_drive_state(self, state):
+        if self.drive_state != state:
+            self.drive_state = state
+
     def set_hazard_lights(self, state):
         self.hazard = state
 
     def set_exhaust_sound(self, state):
         self.exhaust_sound = state
+
+    def set_f1(self, state):
+        self.f1 = state
+
+    def set_f2(self, state):
+        self.f2 = state
 
     def set_drive_state(self, state):
         self.drive_state = state
@@ -371,26 +522,46 @@ while True:
         continue
 
     pressed_buttons = decode_button_press(message.data)
-    warning_button = pressed_buttons[-1]
-    park_button = pressed_buttons[-2]
-    reverse_button = pressed_buttons[-3]
-    neutral_button = pressed_buttons[-4]
-    drive_button = pressed_buttons[-5]
 
-    if warning_button:
-        controller.process_hazard_button_press()
+    if pressed_buttons[BUTTON_PRESSED_HAZARD]:
+        print('PRESSED_HAZARD')
+        controller.process_button_pressed(BUTTON_HAZARD)
+    if pressed_buttons[BUTTON_PRESSED_PARK]:
+        print('PRESSED_PARK')
+        controller.process_button_pressed(BUTTON_PARK)
+    if pressed_buttons[BUTTON_PRESSED_REVERSE]:
+        print('PRESSED_REVERSE')
+        controller.process_button_pressed(BUTTON_REVERSE)
+    if pressed_buttons[BUTTON_PRESSED_NEUTRAL]:
+        print('PRESSED_NEUTRAL')
+        controller.process_button_pressed(BUTTON_NEUTRAL)
+    if pressed_buttons[BUTTON_PRESSED_DRIVE]:
+        print('PRESSED_DRIVE')
+        controller.process_button_pressed(BUTTON_DRIVE)
+    if pressed_buttons[BUTTON_PRESSED_AUTOPILOT_SPEED_UP]:
+        print('PRESSED_AUTOPILOT_SPEED_UP')
+        controller.process_button_pressed(BUTTON_AUTOPILOT_SPEED_UP)
+    if pressed_buttons[BUTTON_PRESSED_EXHAUST_SOUND]:
+        print('PRESSED_EXHAUST_SOUND')
+        controller.process_button_pressed(BUTTON_EXHAUST_SOUND)
+    if pressed_buttons[BUTTON_PRESSED_F1]:
+        print('PRESSED_F1')
+        controller.process_button_pressed(BUTTON_F1)
+    if pressed_buttons[BUTTON_PRESSED_F2]:
+        print('PRESSED_F2')
+        controller.process_button_pressed(BUTTON_F2)
+    if pressed_buttons[BUTTON_PRESSED_REGEN]:
+        print('PRESSED_REGEN')
+        controller.process_button_pressed(BUTTON_REGEN)
+    if pressed_buttons[BUTTON_PRESSED_AUTOPILOT_ON]:
+        print('PRESSED_AUTOPILOT_ON')
+        controller.process_button_pressed(BUTTON_AUTOPILOT_ON)
+    if pressed_buttons[BUTTON_PRESSED_AUTOPILOT_SPEED_DOWN]:
+        print('PRESSED_AUTOPILOT_SPEED_DOWN')
+        controller.process_button_pressed(BUTTON_AUTOPILOT_SPEED_DOWN)
 
-    if park_button:
-        print("park button")
 
-    if reverse_button:
-        print("reverse button")
 
-    if neutral_button:
-        print("neutral button")
-    
-    if drive_button:
-        print("drive button")
 
     if keypad_awake == False:
         keypad_awake = True
