@@ -121,12 +121,12 @@ class PadButton:
             self.green = 1
             self.blue = 0
         elif color == COLOR_WHITE:
-            print("changing color white")
+            print("changing color to white")
             self.red = 1
             self.green = 1
             self.blue = 1
         elif color == COLOR_BLACK:
-            print("changing color black")
+            print("changing color to black")
             self.red = 0
             self.green = 0
             self.blue = 0
