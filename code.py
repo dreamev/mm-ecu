@@ -94,7 +94,85 @@ class Logger:
     def log(self, n):
         if self.log_level == "debug":
             print(n)
+     
+# Class ParkingBreak manages four distinct pins on the GPIO board
+# GPIO 6 - Status (Engaged/Disengaged?)
+# GPIO 9 - Status (Engaged/Disengaged?)
+# GPIO 11 - Trigger (Engaged/Disengaged?)
+# GPIO 13 - Trigger (Engaged/Disengaged?)
+class ParkingBreak:
+    # On init, ParkingBreak needs to determine the status of the physical parking
+    # break by querying the appropriate "Status" pin and setting the state as appropriate.
+    # Usage of any other method in this class should block until state has been properly determined
+    #
+    # Consumers of ParkingBreak should be able to query for status
+    def __init__(self, engaged_pin, disengaged_pin, engage_pin, disengage_pin):
+        self.sensor_engaged_pin = digitalio.DigitalInOut(engaged_pin)
+        self.sensor_engaged_pin.direction = digitalio.Direction.INPUT
+        self.sensor_engaged_pin.pull = digitalio.Pull.UP
+        self.sensor_disengaged_pin = digitalio.DigitalInOut(disengaged_pin)
+        self.sensor_disengaged_pin.direction = digitalio.Direction.INPUT
+        self.sensor_disengaged_pin.pull = digitalio.Pull.UP
+        
+        self.trigger_engage_pin = digitalio.DigitalInOut(engage_pin)
+        self.trigger_engage_pin.direction = digitalio.Direction.OUTPUT
+        self.trigger_disengage_pin = digitalio.DigitalInOut(disengage_pin)
+        self.trigger_disengage_pin.direction = digitalio.Direction.OUTPUT
+        self.engaged = False
+        self.get_current_state()
+        
+    def is_engaged(self):
+        print("parking break status %s", self.engaged)
+        return self.engaged
+        
+    def engage(self):
+        print("ENGAGE PARKING BREAK %s", self.engaged)
+        if not self.engaged:
+            print("SETTING GPIO ENABLED PIN")
+            self.trigger_engage_pin.value = True
+            self.trigger_disengage_pin.value = False
+            self.engaged = True
+       
+    def disengage(self):
+        print("DISENGAGE PARKING BREAK")
+        if self.engaged:
+            print("SETTING GPIO DISABLE PIN")
+            self.trigger_engage_pin.value = False
+            self.trigger_disengage_pin.value = True
+            self.engaged = False
+            
+    def toggle(self):
+        self.engaged = not self.engaged
+        
+    def get_current_state(self):
+        if self.sensor_engaged_pin.value:
+            print("PARKING BREAK CURRENTLY ENGAGED")
+            self.engaged = True
+            self.trigger_engage_pin.value = True
+            self.trigger_disengage_pin.value = False
+        elif self.sensor_disengaged_pin.value:
+            print("PARKING BREAK CURRENTLY DISENGAGED")
+            self.engaged = False
+            self.trigger_engage_pin.value = False
+            self.trigger_disengage_pin.value = True
+        else:
+            # TODO: Figure out proper error handling in circuitpython
+            print("shit's weird, bro")
 
+
+# Class Microcontroller is designed to interface with GPIO pins directly
+# on the board. It should be able to read and report an arbitrary pin
+# or set it as such
+class Microcontroller:
+    def __init__(self):
+        print("microcontroller")
+       
+    def read_pin(self, pin):
+        print("pin state")
+        
+    def set_pin(self, pin, value):
+        print("set pin state") 
+        
 
 class CanMessage:
     def __init__(self, id, data):
@@ -257,11 +335,16 @@ class ControlPadView:
     
 
 class ECUController:
-    def __init__(self, ecu, pad):
+    def __init__(self, ecu, pad, parking_break):
         self.ecu = ecu
         self.pad = pad
+        self.parking_break = parking_break
 
-    def process_button_pressed(self, index):
+    def init_start_state(self):
+        self.init_hazard()
+        self.init_drive_state()
+
+    def process_button_pressed(self, index, init=False):
         print("in process_button_pressed %i", index)
         if index == BUTTON_HAZARD:
             self.process_button_pressed_hazard()
@@ -281,30 +364,51 @@ class ECUController:
             self.process_button_pressed_f1()
         if index == BUTTON_F2:
             self.process_button_pressed_f2()
-        if index == BUTTON_REGEN :
+        if index == BUTTON_REGEN:
             self.process_button_pressed_regen()
-        if index == BUTTON_AUTOPILOT_ON :
+        if index == BUTTON_AUTOPILOT_ON:
             self.process_button_pressed_autopilot_on()
-        if index == BUTTON_AUTOPILOT_SPEED_DOWN :
+        if index == BUTTON_AUTOPILOT_SPEED_DOWN:
             self.process_button_pressed_autopilot_speed_down()
+
+    def init_hazard(self):
+        if self.ecu.hazard == ENABLED:
+            self.hazard_on()
+
+    def hazard_on(self):
+        self.ecu.set_hazard_lights(ENABLED)
+        self.pad.update_color(BUTTON_HAZARD, COLOR_YELLOW)
+
+    def hazard_off(self):
+        self.ecu.set_hazard_lights(DISABLED)
+        self.pad.update_color(BUTTON_HAZARD, COLOR_BLACK)
 
     def process_button_pressed_hazard(self):
         print("PROCESSING HAZARD BUTTON PRESS")
-
         if self.ecu.hazard == DISABLED:
-            self.ecu.set_hazard_lights(ENABLED)
-            self.pad.update_color(BUTTON_HAZARD, COLOR_YELLOW)
+            self.hazard_on()
         else:
-            self.ecu.set_hazard_lights(DISABLED)
-            self.pad.update_color(BUTTON_HAZARD, COLOR_BLACK)
+            self.hazard_off()
+
+    def init_drive_state(self):
+        if self.parking_break.is_engaged():
+            self.ecu.set_drive_state(PARK)
+            self.pad.update_color(BUTTON_PARK, COLOR_BLUE)
+            self.parking_break.engage()
+            
+        self.pad.update_color(BUTTON_REVERSE, COLOR_BLACK)
+        self.pad.update_color(BUTTON_NEUTRAL, COLOR_BLACK)
+        self.pad.update_color(BUTTON_DRIVE, COLOR_BLACK)
 
     def process_button_pressed_park(self):
         print("PROCESSING PARK BUTTON PRESS")
         current_state = self.ecu.drive_state
-        future_state = PARK
-
-        if current_state != future_state:
-            self.ecu.set_drive_state(future_state)
+        
+        if current_state != PARK:
+            self.ecu.set_drive_state(PARK)
+            self.parking_break.engage()
+           
+            # Change Park to BLUE, all other toggles OFF 
             self.pad.update_color(BUTTON_PARK, COLOR_BLUE)
             self.pad.update_color(BUTTON_REVERSE, COLOR_BLACK)
             self.pad.update_color(BUTTON_NEUTRAL, COLOR_BLACK)
@@ -313,10 +417,11 @@ class ECUController:
     def process_button_pressed_reverse(self):
         print("PROCESSING REVERSE BUTTON PRESS")
         current_state = self.ecu.drive_state
-        future_state = REVERSE
-
-        if current_state != future_state:
-            self.ecu.set_drive_state(future_state)
+        if current_state == PARK:
+            self.parking_break.disengage()
+            
+        if current_state != REVERSE: 
+            self.ecu.set_drive_state(REVERSE)
             self.pad.update_color(BUTTON_PARK, COLOR_BLACK)
             self.pad.update_color(BUTTON_REVERSE, COLOR_RED)
             self.pad.update_color(BUTTON_NEUTRAL, COLOR_BLACK)
@@ -325,10 +430,11 @@ class ECUController:
     def process_button_pressed_neutral(self):
         print("PROCESSING NEUTRAL BUTTON PRESS")
         current_state = self.ecu.drive_state
-        future_state = NEUTRAL
-
-        if current_state != future_state:
-            self.ecu.set_drive_state(future_state)
+        if current_state == PARK:
+            self.parking_break.disengage()
+        
+        if current_state != NEUTRAL: 
+            self.ecu.set_drive_state(NEUTRAL)
             self.pad.update_color(BUTTON_PARK, COLOR_BLACK)
             self.pad.update_color(BUTTON_REVERSE, COLOR_BLACK)
             self.pad.update_color(BUTTON_NEUTRAL, COLOR_YELLOW)
@@ -337,15 +443,15 @@ class ECUController:
     def process_button_pressed_drive(self):
         print("PROCESSING DRIVE BUTTON PRESS")
         current_state = self.ecu.drive_state
-        future_state = DRIVE
+        if current_state == PARK:
+            self.parking_break.disengage()
 
-        if current_state != future_state:
-            self.ecu.set_drive_state(future_state)
+        if current_state != DRIVE:
+            self.ecu.set_drive_state(DRIVE)
             self.pad.update_color(BUTTON_PARK, COLOR_BLACK)
             self.pad.update_color(BUTTON_REVERSE, COLOR_BLACK)
             self.pad.update_color(BUTTON_NEUTRAL, COLOR_BLACK)
             self.pad.update_color(BUTTON_DRIVE, COLOR_GREEN)
-
         
     def process_button_pressed_autopilot_speed_up(self):
         print("PROCESSING AUTOPILOT_SPEED_UP BUTTON PRESS")
@@ -395,7 +501,7 @@ class ECUController:
 
 class ECU:
     def __init__(self):
-        self.hazard = DISABLED
+        self.hazard = ENABLED
         self.drive_state = PARK
         self.exhaust_sound = DISABLED
         self.power_state = LOW_POWER
@@ -461,6 +567,7 @@ def toggle_warning_light(state):
         return turn_off_warning_light()
     else:
         return turn_on_warning_light()
+    
 
 def turn_off_warning_light():
     cm = CanMessage(0x215, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
@@ -503,7 +610,8 @@ count = 0
 warning = False
 ecu = ECU()
 pad = ControlPadView(can)
-controller = ECUController(ecu, pad)
+parking_break = ParkingBreak(board.D9, board.D6, board.D13, board.D11)
+controller = ECUController(ecu, pad, parking_break)
 
 while True:
     bus_state = can.state
@@ -511,11 +619,17 @@ while True:
         old_bus_state = bus_state
 
     if keypad_awake != True:
-        print("trying to wake keypad")
+        print("waiting for keypad to wake")
+        # time.sleep(3)
+        print("init keypad")
         keypad_awake_message = CanMessage(0x0, [0x01])
         message = keypad_awake_message.message()
         can.send(message)
-        turn_off_all_lights()
+        controller.init_start_state()
+    
+    if keypad_awake == False:
+        keypad_awake = True
+    
 
     message = listener.receive()
     if message is None:
@@ -560,12 +674,4 @@ while True:
         print('PRESSED_AUTOPILOT_SPEED_DOWN')
         controller.process_button_pressed(BUTTON_AUTOPILOT_SPEED_DOWN)
 
-
-
-
-    if keypad_awake == False:
-        keypad_awake = True
-
     time.sleep(.1)
-
-
