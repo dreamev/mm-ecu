@@ -119,7 +119,7 @@ class ParkingBreak:
         self.trigger_disengage_pin = digitalio.DigitalInOut(disengage_pin)
         self.trigger_disengage_pin.direction = digitalio.Direction.OUTPUT
         self.engaged = False
-        self.get_current_state()
+        self.init_current_state()
         
     def is_engaged(self):
         print("parking break status %s", self.engaged)
@@ -129,8 +129,8 @@ class ParkingBreak:
         print("ENGAGE PARKING BREAK %s", self.engaged)
         if not self.engaged:
             print("SETTING GPIO ENABLED PIN")
-            self.trigger_engage_pin.value = True
             self.trigger_disengage_pin.value = False
+            self.trigger_engage_pin.value = True
             self.engaged = True
        
     def disengage(self):
@@ -144,7 +144,7 @@ class ParkingBreak:
     def toggle(self):
         self.engaged = not self.engaged
         
-    def get_current_state(self):
+    def init_current_state(self):
         if self.sensor_engaged_pin.value:
             print("PARKING BREAK CURRENTLY ENGAGED")
             self.engaged = True
@@ -394,7 +394,7 @@ class ECUController:
         if self.parking_break.is_engaged():
             self.ecu.set_drive_state(PARK)
             self.pad.update_color(BUTTON_PARK, COLOR_BLUE)
-            self.parking_break.engage()
+            self.parking_break.engage() ## Why do I need to re-engage something that is already engaged?
             
         self.pad.update_color(BUTTON_REVERSE, COLOR_BLACK)
         self.pad.update_color(BUTTON_NEUTRAL, COLOR_BLACK)
@@ -610,7 +610,7 @@ count = 0
 warning = False
 ecu = ECU()
 pad = ControlPadView(can)
-parking_break = ParkingBreak(board.D9, board.D6, board.D13, board.D11)
+parking_break = ParkingBreak(board.D6, board.D9, board.D13, board.D11)
 controller = ECUController(ecu, pad, parking_break)
 
 while True:
