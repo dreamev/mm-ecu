@@ -572,20 +572,51 @@ def toggle_warning_light(state):
 def turn_off_warning_light():
     cm = CanMessage(0x215, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     message = cm.message()
-    can.send(message)
+    application.can.send(message)
     return False
 
 def turn_on_warning_light():
     cm = CanMessage(0x215, [0x02, 0x20, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00])
     message = cm.message()
-    can.send(message)
+    application.can.send(message)
     return True 
 
 def turn_off_all_lights():
     print("turning off all lights")
     cm = CanMessage(0x215, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     message = cm.message()
-    can.send(message)
+    application.can.send(message)
+    
+class Application:
+    LISTEN_FOR = [canio.Match(0x195), canio.Match(0x595), canio.Match(0x715)] 
+    
+    def __init__(self, can = None, listener = None):
+        self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=125_000, auto_restart=False)
+        self.listener = self.can.listen(matches=Application.LISTEN_FOR, timeout=.1)
+        self.ecu = ECU()
+        self.pad = ControlPadView(self.can)
+        self.parking_break = ParkingBreak(board.D6, board.D9, board.D13, board.D11)
+        self.controller = ECUController(self.ecu, self.pad, self.parking_break)
+            
+    def new_controller(self):
+        self.pad = ControlPadView(self.can)
+        self.controller = ECUController(self.ecu, self.pad, self.parking_break)
+        
+    def send_baud_rate_upgrade_request(self):
+        # Request upgrade to 500_000 baud
+        upgrade_baud_rate_can_message = CanMessage(0x615, [0x2F, 0x10, 0x20, 0x00, 0x02, 0x00, 0x00, 0x00])
+        upgrade_baud_rate_message = upgrade_baud_rate_can_message.message()
+        self.can.send(upgrade_baud_rate_message)
+        
+    def upgrade_baud_rate(self):
+        self.can.deinit()
+        self.listener.deinit()
+        self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=500_000, auto_restart=True)
+        self.listener = self.can.listen(matches=Application.LISTEN_FOR, timeout=.1)
+        self.new_controller()
+
+    
+####### BEGIN MAIN PROGRAM FLOW ########
 
 # If the CAN transceiver has a standby pin, bring it out of standby mode
 if hasattr(board, 'CAN_STANDBY'):
@@ -597,81 +628,77 @@ if hasattr(board, 'BOOST_ENABLE'):
     boost_enable = digitalio.DigitalInOut(board.BOOST_ENABLE)
     boost_enable.switch_to_output(True)
 
-# Use this line if your board has dedicated CAN pins. (Feather M4 CAN and Feather STM32F405)
-can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=125_000, auto_restart=True)
-# On ESP32S2 most pins can be used for CAN.  Uncomment the following line to use IO5 and IO6
-#can = canio.CAN(rx=board.IO6, tx=board.IO5, baudrate=250_000, auto_restart=True)
-listener = can.listen(matches=[canio.Match(0x195)], timeout=.1)
-
+        
+application = Application()        
 keypad_awake = False
 demo_mode = False
 old_bus_state = None
 count = 0
 warning = False
-ecu = ECU()
-pad = ControlPadView(can)
-parking_break = ParkingBreak(board.D6, board.D9, board.D13, board.D11)
-controller = ECUController(ecu, pad, parking_break)
 
 while True:
-    bus_state = can.state
+    bus_state = application.can.state
     if bus_state != old_bus_state:
         old_bus_state = bus_state
 
     if keypad_awake != True:
-        print("waiting for keypad to wake")
-        # time.sleep(3)
         print("init keypad")
         keypad_awake_message = CanMessage(0x0, [0x01])
         message = keypad_awake_message.message()
-        can.send(message)
-        controller.init_start_state()
+        application.can.send(message)
     
-    if keypad_awake == False:
-        keypad_awake = True
-    
-
-    message = listener.receive()
+    message = application.listener.receive()
     if message is None:
         continue
+    
+    # Heartbeat Message 
+    if message.id == 0x715:
+        keypad_awake = True
+        application.controller.init_start_state()
+        application.send_upgrade_baud_rate_request()
+    elif message.id == 0x595:
+        print('upgrade baud rate to 500_000')
+        application.upgrade_baud_rate_connection()
+    elif message.id == 0x195:
+        button_pressed = decode_button_press(message.data)
 
-    pressed_buttons = decode_button_press(message.data)
-
-    if pressed_buttons[BUTTON_PRESSED_HAZARD]:
-        print('PRESSED_HAZARD')
-        controller.process_button_pressed(BUTTON_HAZARD)
-    if pressed_buttons[BUTTON_PRESSED_PARK]:
-        print('PRESSED_PARK')
-        controller.process_button_pressed(BUTTON_PARK)
-    if pressed_buttons[BUTTON_PRESSED_REVERSE]:
-        print('PRESSED_REVERSE')
-        controller.process_button_pressed(BUTTON_REVERSE)
-    if pressed_buttons[BUTTON_PRESSED_NEUTRAL]:
-        print('PRESSED_NEUTRAL')
-        controller.process_button_pressed(BUTTON_NEUTRAL)
-    if pressed_buttons[BUTTON_PRESSED_DRIVE]:
-        print('PRESSED_DRIVE')
-        controller.process_button_pressed(BUTTON_DRIVE)
-    if pressed_buttons[BUTTON_PRESSED_AUTOPILOT_SPEED_UP]:
-        print('PRESSED_AUTOPILOT_SPEED_UP')
-        controller.process_button_pressed(BUTTON_AUTOPILOT_SPEED_UP)
-    if pressed_buttons[BUTTON_PRESSED_EXHAUST_SOUND]:
-        print('PRESSED_EXHAUST_SOUND')
-        controller.process_button_pressed(BUTTON_EXHAUST_SOUND)
-    if pressed_buttons[BUTTON_PRESSED_F1]:
-        print('PRESSED_F1')
-        controller.process_button_pressed(BUTTON_F1)
-    if pressed_buttons[BUTTON_PRESSED_F2]:
-        print('PRESSED_F2')
-        controller.process_button_pressed(BUTTON_F2)
-    if pressed_buttons[BUTTON_PRESSED_REGEN]:
-        print('PRESSED_REGEN')
-        controller.process_button_pressed(BUTTON_REGEN)
-    if pressed_buttons[BUTTON_PRESSED_AUTOPILOT_ON]:
-        print('PRESSED_AUTOPILOT_ON')
-        controller.process_button_pressed(BUTTON_AUTOPILOT_ON)
-    if pressed_buttons[BUTTON_PRESSED_AUTOPILOT_SPEED_DOWN]:
-        print('PRESSED_AUTOPILOT_SPEED_DOWN')
-        controller.process_button_pressed(BUTTON_AUTOPILOT_SPEED_DOWN)
-
+        if button_pressed[BUTTON_PRESSED_HAZARD]:
+            print('PRESSED_HAZARD')
+            application.controller.process_button_pressed(BUTTON_HAZARD)
+        if button_pressed[BUTTON_PRESSED_PARK]:
+            print('PRESSED_PARK')
+            application.controller.process_button_pressed(BUTTON_PARK)
+        if button_pressed[BUTTON_PRESSED_REVERSE]:
+            print('PRESSED_REVERSE')
+            application.controller.process_button_pressed(BUTTON_REVERSE)
+        if button_pressed[BUTTON_PRESSED_NEUTRAL]:
+            print('PRESSED_NEUTRAL')
+            application.controller.process_button_pressed(BUTTON_NEUTRAL)
+        if button_pressed[BUTTON_PRESSED_DRIVE]:
+            print('PRESSED_DRIVE')
+            application.controller.process_button_pressed(BUTTON_DRIVE)
+        if button_pressed[BUTTON_PRESSED_AUTOPILOT_SPEED_UP]:
+            print('PRESSED_AUTOPILOT_SPEED_UP')
+            application.controller.process_button_pressed(BUTTON_AUTOPILOT_SPEED_UP)
+        if button_pressed[BUTTON_PRESSED_EXHAUST_SOUND]:
+            print('PRESSED_EXHAUST_SOUND')
+            application.controller.process_button_pressed(BUTTON_EXHAUST_SOUND)
+        if button_pressed[BUTTON_PRESSED_F1]:
+            print('PRESSED_F1')
+            application.controller.process_button_pressed(BUTTON_F1)
+        if button_pressed[BUTTON_PRESSED_F2]:
+            print('PRESSED_F2')
+            application.controller.process_button_pressed(BUTTON_F2)
+        if button_pressed[BUTTON_PRESSED_REGEN]:
+            print('PRESSED_REGEN')
+            application.controller.process_button_pressed(BUTTON_REGEN)
+        if button_pressed[BUTTON_PRESSED_AUTOPILOT_ON]:
+            print('PRESSED_AUTOPILOT_ON')
+            application.controller.process_button_pressed(BUTTON_AUTOPILOT_ON)
+        if button_pressed[BUTTON_PRESSED_AUTOPILOT_SPEED_DOWN]:
+            print('PRESSED_AUTOPILOT_SPEED_DOWN')
+            application.controller.process_button_pressed(BUTTON_AUTOPILOT_SPEED_DOWN)
+    else:
+        print("unknown message: [%] %" % (message.id, message.data))
+        
     time.sleep(.1)
