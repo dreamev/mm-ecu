@@ -1,2 +1,4 @@
 .Trashes
 .fseventsd/fseventsd-uuid
+.vscode
+.vscode/*
