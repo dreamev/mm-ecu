@@ -88,10 +88,47 @@ class ParkingBreak:
         self.engaged = not self.engaged
         
 
+class PadState:
+    UNKNOWN = "Unknown"
+    PRE_OPERATIONAL = "Pre-operational"
+    OPERATIONAL = "Operational"
+
 class Pad:
     HEARTBEAT_ID = 0x715 
-    BUTTON_EVENT_ID = 0x195 
+    BUTTON_EVENT_ID = 0x195  
     
+    def __init__(self):
+        self.state = PadState.UNKNOWN
+
+    def to_pre_operational(self):
+        if self.state == PadState.UNKNOWN:
+            self.state = PadState.PRE_OPERATIONAL
+            print("Pad is now Pre-operational.")
+        else:
+            print("Transition to Pre-operational is not allowed from", self.state)
+
+    def to_operational(self):
+        if self.state == PadState.PRE_OPERATIONAL:
+            self.state = PadState.OPERATIONAL
+            print("Pad is now Operational.")
+        else:
+            print("Transition to Operational is not allowed from", self.state)
+
+    def reset(self):
+        self.state = PadState.UNKNOWN
+        print("Pad has been reset to Unknown state.")
+
+    def __str__(self):
+        return f"Pad(state={self.state})"
+
+
+    
+#  1. Initialize your CAN bus interface and establish a connection with the panel.
+#  2. Send an NMT message to start the panel in pre-operational mode (Identifier 00h, Byte 0 80h).
+#  3. Use SDO messages to configure the panel's heartbeat settings (e.g. set Object 1017h to 1000 milliseconds).
+#  4. Use an SDO message to set the panel's communication baudrate to 500k (e.g. set Object 001A:00h to 500000).
+#  5. Deallocate your existing CAN connection and re-establish the connection at the new baudrate.
+#  6. Send an NMT message to start the panel in operational mode (Identifier 00h, Byte 0 01h).
 
 class Application:
     INITAL_BAUD_RATE = 125_000
@@ -102,19 +139,20 @@ class Application:
         self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=self.baud_rate, auto_restart=True)
         self.listener = self.can.listen(matches=[Pad.HEARTBEAT_ID], timeout=.1)
         self.parking_break = ParkingBreak(board.D6, board.D9, board.D13, board.D11)
+        self.pad = Pad()
         
-    def send_baud_rate_upgrade_request(self):
-        # Request upgrade to 500_000 baud
-        upgrade_baud_rate_can_message = CanMessage(0x615, [0x2F, 0x10, 0x20, 0x00, 0x02, 0x00, 0x00, 0x00])
-        upgrade_baud_rate_message = upgrade_baud_rate_can_message.message()
-        self.can.send(upgrade_baud_rate_message)
-        
-    def upgrade_baud_rate(self):
-        self.can.deinit()
-        self.listener.deinit()
-        self.baud_rate = Application.EXPECTED_BAUD_RATE
-        self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=self.baud_rate, auto_restart=True)
-        self.listener = self.can.listen(matches=[Pad.HEARTBEAT_ID], timeout=.1)
+    # def send_baud_rate_upgrade_request(self):
+    #     # Request upgrade to 500_000 baud
+    #     upgrade_baud_rate_can_message = CanMessage(0x615, [0x2F, 0x10, 0x20, 0x00, 0x02, 0x00, 0x00, 0x00])
+    #     upgrade_baud_rate_message = upgrade_baud_rate_can_message.message()
+    #     self.can.send(upgrade_baud_rate_message)
+    #     
+    # def upgrade_baud_rate(self):
+    #     self.can.deinit()
+    #     self.listener.deinit()
+    #     self.baud_rate = Application.EXPECTED_BAUD_RATE
+    #     self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=self.baud_rate, auto_restart=True)
+    #     self.listener = self.can.listen(matches=[canio.Matches(pad.HEARTBEAT_ID], timeout=.1)
        
     def process_can_bus(self):
         self.current_bus_state = self.can.state
@@ -125,11 +163,13 @@ class Application:
     def process_can_message(self):
         message = self.listener.receive()
         
-        if message.id == Application.HEARTBEAT_ID and self.baud_rate == Application.INITAL_BAUD_RATE:
-            self.send_baud_rate_upgrade_request()
-            self.upgrade_baud_rate()
-        elif message.id == Application.HEARTBEAT_ID and self.baud_rate == Application.EXPECTED_BAUD_RATE:
-            print(f"heartbeat")
+        if message is None:
+            pass
+        # if message.id == Application.HEARTBEAT_ID and self.baud_rate == Application.INITAL_BAUD_RATE:
+        #     self.send_baud_rate_upgrade_request()
+        #     self.upgrade_baud_rate()
+        # elif message.id == Application.HEARTBEAT_ID and self.baud_rate == Application.EXPECTED_BAUD_RATE:
+        #     print(f"heartbeat")
         else:
             print(f"unknown message: [{message.id}] {message.data}")
             
