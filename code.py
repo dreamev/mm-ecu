@@ -177,7 +177,6 @@ class Application:
     def __init__(self, can = None, listener = None):
         self.pad = Pad()
         self.parking_brake = ParkingBrake(board.D6, board.D9, board.D13, board.D11)
-        
         self.baud_rate = Application.INITAL_BAUD_RATE
         self.setup_can_connection(self.baud_rate)
         
