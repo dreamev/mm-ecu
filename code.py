@@ -164,34 +164,37 @@ class Pad:
     def __str__(self):
         return f"Pad(state={self.state})"
     
-#  1. Initialize your CAN bus interface and establish a connection with the panel.
-#  2. Send an NMT message to start the panel in pre-operational mode (Identifier 00h, Byte 0 80h).
-#  3. Use SDO messages to configure the panel's heartbeat settings (e.g. set Object 1017h to 1000 milliseconds).
-#  4. Use an SDO message to set the panel's communication baudrate to 500k (e.g. set Object 001A:00h to 500000).
-#  5. Deallocate your existing CAN connection and re-establish the connection at the new baudrate.
-#  6. Send an NMT message to start the panel in operational mode (Identifier 00h, Byte 0 01h).
+# - Send an NMT message to start the panel in pre-operational mode (Identifier 00h, Byte 0 80h).
+# - Use SDO messages to configure the panel's heartbeat settings (e.g. set Object 1017h to 1000 milliseconds).
+# - Use an SDO message to set the panel's communication baudrate to 500k (e.g. set Object 001A:00h to 500000).
+# - Deallocate your existing CAN connection and re-establish the connection at the new baudrate.
+# - Send an NMT message to start the panel in operational mode (Identifier 00h, Byte 0 01h).
 class Application:
     INITAL_BAUD_RATE = 125_000
     EXPECTED_BAUD_RATE = 500_000
    
     def __init__(self, can = None, listener = None):
+        print(f"inside __init__")
         self.pad = Pad()
         self.parking_brake = ParkingBrake(board.D6, board.D9, board.D13, board.D11)
         self.baud_rate = Application.INITAL_BAUD_RATE
         self.setup_can_connection(self.baud_rate)
         
     def setup_can_connection(self, baudrate):
+        print(f"inside setup_can_connection")
         self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=baudrate, auto_restart=True)
         self.listener = self.can.listen(matches=[Pad.HEARTBEAT_ID, Pad.BUTTON_EVENT_ID], timeout=.1)
         
     def upgrade_can_connection_baud_rate(self):
+        print(f"inside upgrade_can_connection_baud_rate")
         self.can.deinit()
         self.listener.deinit()
         self.baud_rate = Application.EXPECTED_BAUD_RATE
         self.setup_can_connection(self.baud_rate)
         
     def ensure_pad_operational(self):
-        if self.pad.state == PadState.BOOT_UP:
+        print(f"inside ensure_pad_operational")
+        if self.pad.state == PadState.BOOT_UP or self.pad.state == PadState.UNKNOWN:
             self.send_pad_enter_pre_operational_mode()
         elif self.pad.state == PadState.PRE_OPERATIONAL and self.baud_rate == Application.INITAL_BAUD_RATE:
             print(f"pad at incorrect baud rate, attempting upgrade")
@@ -200,13 +203,14 @@ class Application:
         elif self.pad.state == PadState.PRE_OPERATIONAL and self.baud_rate == Application.EXPECTED_BAUD_RATE:
             print(f"pad at correct baud rate, activating keypad")
             self.send_pad_activate()
-        elif self.pad.state == PadState.UNKNOWN or self.pad.state == PadState.OPERATIONAL:
+        elif self.pad.state == PadState.OPERATIONAL:
             print(f"ignoring current state: [{self.pad.state}]")
             pass
         else:
             print(f"unknown state: [{self.pad.state}]")
             
     def process_pad_heartbeat(self, message):
+        print(f"inside process_pad_heartbeat")
         if self.pad.can_is_heartbeat_boot_up(message.data):
             self.pad.to_boot_up()
         elif self.pad.can_is_heartbeat_pre_operational(message.data):
@@ -217,44 +221,52 @@ class Application:
             print(f"unknown heartbeat: [{message.id}] {message.data}")
                 
     def can_send_message(self, id, data):
+        print(f"inside can_send_message")
         message = CanMessage(id, data).message()
         self.can.send(message)
     
     def send_pad_activate(self): 
+        print(f"inside send_pad_activate")
         id, data = self.pad.can_activate_keypad()
         self.can_send_message(id, data)
         
     def send_pad_enter_pre_operational_mode(self):
+        print(f"inside send_pad_enter_pre_operational_mode")
         id, data = self.pad.can_enter_pre_operational()
         self.can_send_message(id, data)
         
     def send_pad_activate_bootup_service(self):
+        print(f"inside send_pad_activate_bootup_service")
         id, data = self.pad.can_activate_bootup_service()
-        message = CanMessage(0x615, [0x2F, 0x11, 0x20, 0x00, 0x01, 0x00, 0x00]).message()
         self.can_send_message(id, data)
             
     def send_pad_baud_rate_upgrade_request(self):
+        print(f"inside send_baud_rate_upgrade_request")
         id, data = self.pad.can_baud_rate_upgrade_request() 
-        message = CanMessage(id, data).message()
-        self.can.send(message)
+        self.can_send_message(id, data)
             
     def process_pad_button(self, message):
         print(f"do a thing")
         
     def process_can_bus(self):
+        print(f"inside process_can_bus")
         self.current_bus_state = self.can.state
         if self.current_bus_state != self.previous_bus_state:
             print("CAN bus state:", self.current_bus_state)
             self.previous_bus_state = self.current_bus_state
             
     def process_can_message(self):
+        print(f"inside process_can_message")
         message = self.listener.receive()
         
         if message is None:
+            print(f"no message, passing")
             pass
         elif message.id == Pad.HEARTBEAT_ID:
+            print(f"heartbeat detected")
             self.process_pad_heartbeat(message)
         elif message.id == Pad.BUTTON_EVENT_ID:
+            print(f"pad button press detected")
             self.process_pad_button(message)
         else:
             print(f"unknown message: [{message.id}] {message.data}")
@@ -275,6 +287,7 @@ if hasattr(board, 'BOOST_ENABLE'):
 application = Application()
 
 while True:
+    print(f"main tick")
     application.process_can_bus()
     application.process_can_message()
     application.ensure_pad_operational()
