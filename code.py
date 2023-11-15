@@ -141,7 +141,7 @@ class ECU:
         self.hazard = ECUState.ENABLED
         self.drive_state = ECUState.PARK
         self.exhaust_sound = ECUState.DISABLED
-        self.power_state = ECU.LOW_POWER
+        self.power_state = ECUState.LOW_POWER
         self.regen_state = ECUState.ENABLED
         self.cruise_state = ECUState.DISABLED
         self.target_cruise_speed = 0
@@ -258,7 +258,7 @@ class Pad:
     
     def __init__(self):
         self.state = PadState.UNKNOWN
-        self.buttons = [PadButton(id) for name, id in PadButton.BUTTON_IDS.items()]
+        self.buttons = [PadButton(id) for name, id in PadButton.BUTTONS.items()]
         
     def to_boot_up(self):
         if self.state == PadState.UNKNOWN:
@@ -393,7 +393,7 @@ class VehicleController:
         }
 
         if self.parking_brake.is_engaged():
-            self.ecu.set_drive_state(ECUState.PARK)
+            # self.ecu.set_state(ECUState.PARK, ECUState.ENABLED)
             self.parking_brake.engage() 
 
         for button, color in button_state.items():
