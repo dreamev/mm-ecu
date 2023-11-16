@@ -95,36 +95,48 @@ class Logger:
         if self.log_level == "debug":
             print(n)
      
+# Class ParkingBreak manages four distinct pins on the GPIO board
+# GPIO 6 - Status (Engaged/Disengaged?)
+# GPIO 9 - Status (Engaged/Disengaged?)
+# GPIO 11 - Trigger (Engaged/Disengaged?)
+# GPIO 13 - Trigger (Engaged/Disengaged?)
 class ParkingBreak:
+    # On init, ParkingBreak needs to determine the status of the physical parking
+    # break by querying the appropriate "Status" pin and setting the state as appropriate.
+    # Usage of any other method in this class should block until state has been properly determined
+    #
+    # Consumers of ParkingBreak should be able to query for status
     def __init__(self, engaged_pin, disengaged_pin, engage_pin, disengage_pin):
         self.sensor_engaged_pin = digitalio.DigitalInOut(engaged_pin)
         self.sensor_engaged_pin.direction = digitalio.Direction.INPUT
         self.sensor_engaged_pin.pull = digitalio.Pull.UP
-        
         self.sensor_disengaged_pin = digitalio.DigitalInOut(disengaged_pin)
         self.sensor_disengaged_pin.direction = digitalio.Direction.INPUT
         self.sensor_disengaged_pin.pull = digitalio.Pull.UP
         
         self.trigger_engage_pin = digitalio.DigitalInOut(engage_pin)
         self.trigger_engage_pin.direction = digitalio.Direction.OUTPUT
-        
         self.trigger_disengage_pin = digitalio.DigitalInOut(disengage_pin)
         self.trigger_disengage_pin.direction = digitalio.Direction.OUTPUT
-        
         self.engaged = False
         self.init_current_state()
         
     def is_engaged(self):
+        print("parking break status %s", self.engaged)
         return self.engaged
         
     def engage(self):
+        print("ENGAGE PARKING BREAK %s", self.engaged)
         if not self.engaged:
+            print("SETTING GPIO ENABLED PIN")
             self.trigger_disengage_pin.value = False
             self.trigger_engage_pin.value = True
             self.engaged = True
        
     def disengage(self):
+        print("DISENGAGE PARKING BREAK")
         if self.engaged:
+            print("SETTING GPIO DISABLE PIN")
             self.trigger_engage_pin.value = False
             self.trigger_disengage_pin.value = True
             self.engaged = False
@@ -134,17 +146,18 @@ class ParkingBreak:
         
     def init_current_state(self):
         if self.sensor_engaged_pin.value:
+            print("PARKING BREAK CURRENTLY ENGAGED")
             self.engaged = True
             self.trigger_engage_pin.value = True
             self.trigger_disengage_pin.value = False
         elif self.sensor_disengaged_pin.value:
+            print("PARKING BREAK CURRENTLY DISENGAGED")
             self.engaged = False
             self.trigger_engage_pin.value = False
             self.trigger_disengage_pin.value = True
         else:
             # TODO: Figure out proper error handling in circuitpython
             print("shit's weird, bro")
-
 
 
 # Class Microcontroller is designed to interface with GPIO pins directly
@@ -164,84 +177,94 @@ class Microcontroller:
 class CanMessage:
     def __init__(self, id, data):
         _empty_data = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        self.id = id
+        self.id   = id
 
-        if isinstance(data, list):
-            self.data = bytes(data[:8] + _empty_data[8-len(data):])
+        if type(data) is list:
+            for x in _empty_data:
+                data.append(x)
+                self.data = bytes(data[0:8])
         else:
-            self.data = bytes(_empty_data)
+            self.data = []
 
     def message(self):
         return canio.Message(id=self.id, data=self.data)
 
 
 class PadButton:
-    COLOR_RED = "red"
-    COLOR_BLUE = "blue"
-    COLOR_GREEN = "green"
-    COLOR_MAGENTA = "magenta"
-    COLOR_CYAN = "cyan"
-    COLOR_YELLOW = "yellow"
-    COLOR_WHITE = "white"
-    COLOR_BLACK = "black"
-
-    COLORS = {
-        COLOR_RED: (1, 0, 0),
-        COLOR_BLUE: (0, 0, 1),
-        COLOR_GREEN: (0, 1, 0),
-        COLOR_MAGENTA: (1, 0, 1),
-        COLOR_CYAN: (0, 1, 1),
-        COLOR_YELLOW: (1, 1, 0),
-        COLOR_WHITE: (1, 1, 1),
-        COLOR_BLACK: (0, 0, 0)
-    }
-
-    # init takes an id and initializes the state of the button
     def __init__(self, id):
         self.id = id
         self.red = 0
         self.green = 0
         self.blue = 0
 
-    # change_color takes a color and updates the color of the button
     def change_color(self, color):
-        if color in self.COLORS:
-            self.red, self.green, self.blue = self.COLORS[color]
-            print(f"changing color to {color}")
-        else:
-            print("Invalid color")
+        if color == COLOR_RED:
+            print("changing color to red")
+            self.red = 1
+            self.green = 0
+            self.blue = 0
+        elif color == COLOR_BLUE:
+            print("changing color to blue")
+            self.red = 0
+            self.green = 0
+            self.blue = 1
+        elif color == COLOR_GREEN:
+            print("changing color to green")
+            self.red = 0
+            self.green = 1
+            self.blue = 0
+        elif color == COLOR_MAGENTA:
+            print("changing color to magenta")
+            self.red = 1
+            self.green = 0
+            self.blue = 1
+        elif color == COLOR_CYAN:
+            print("changing color to cyan")
+            self.red = 0
+            self.green = 1
+            self.blue = 1
+        elif color == COLOR_YELLOW:
+            print("changing color to yellow")
+            self.red = 1
+            self.green = 1
+            self.blue = 0
+        elif color == COLOR_WHITE:
+            print("changing color to white")
+            self.red = 1
+            self.green = 1
+            self.blue = 1
+        elif color == COLOR_BLACK:
+            print("changing color to black")
+            self.red = 0
+            self.green = 0
+            self.blue = 0
 
         return self
 
 
-
-# ControlPadView is designed to interface with the CAN bus and manage the state of the buttons
 class ControlPadView:
-    # init takes a CAN bus and initializes the state of the buttons
     def __init__(self, can):
         self.can = can
-        self.buttons = [PadButton(button) for button in [
-            BUTTON_HAZARD,
-            BUTTON_PARK,
-            BUTTON_REVERSE,
-            BUTTON_NEUTRAL,
-            BUTTON_DRIVE,
-            BUTTON_AUTOPILOT_SPEED_UP,
-            BUTTON_EXHAUST_SOUND,
-            BUTTON_F1,
-            BUTTON_F2,
-            BUTTON_REGEN,
-            BUTTON_AUTOPILOT_ON,
-            BUTTON_AUTOPILOT_SPEED_DOWN
-        ]]
+        self.buttons = [
+            PadButton(BUTTON_HAZARD), 
+            PadButton(BUTTON_PARK), 
+            PadButton(BUTTON_REVERSE),
+            PadButton(BUTTON_NEUTRAL), 
+            PadButton(BUTTON_DRIVE), 
+            PadButton(BUTTON_AUTOPILOT_SPEED_UP), 
+            PadButton(BUTTON_EXHAUST_SOUND), 
+            PadButton(BUTTON_F1), 
+            PadButton(BUTTON_F2),
+            PadButton(BUTTON_REGEN), 
+            PadButton(BUTTON_AUTOPILOT_ON), 
+            PadButton(BUTTON_AUTOPILOT_SPEED_DOWN),
+        ]
 
-    # update_color takes an index and a color and updates the color of the button at that index
     def update_color(self, index, color):
-        print(f"updating color for {index}")
+        print("updating color for ", index)
         self.buttons[index].change_color(color)
         self.refresh_button_colors()
 
-    # refresh_button_colors takes the current state of the buttons and sends it to the CAN bus
     def refresh_button_colors(self):
         pad_matrix = self.rgb_matrices()
         payload = self.rgb_matrix_to_hex(pad_matrix)
@@ -250,17 +273,23 @@ class ControlPadView:
         message = cm.message()
         self.can.send(message)
 
-    # rgb_matrices returns a 3x12 matrix of RGB values
     def rgb_matrices(self):
+        i = 0
         pad_rgb_matrix = [
-            [button.red for button in self.buttons[0:12]],
-            [button.green for button in self.buttons[0:12]],
-            [button.blue for button in self.buttons[0:12]],
+            [0] * 12,
+            [0] * 12,
+            [0] * 12,
         ]
+
+        for button in self.buttons[0:12]:
+            pad_rgb_matrix[0][i] = button.red 
+            pad_rgb_matrix[1][i] = button.green
+            pad_rgb_matrix[2][i] = button.blue
+            i = i + 1
 
         return pad_rgb_matrix
 
-    # rgb_matrix_to_hex takes a 3x12 matrix of RGB values and converts it to a list of hex values
+    # TODO: Figure out actual matrix to payload in hex
     def rgb_matrix_to_hex(self, matrix):
         # Flipping ordering of output
         rr = matrix[0][::-1]
@@ -275,19 +304,33 @@ class ControlPadView:
         b4 = [0] * 4 + br[:4]
 
         # Convert list to binary
-        bb0 = int(''.join(map(str, b0)), 2)
-        bb1 = int(''.join(map(str, b1)), 2)
-        bb2 = int(''.join(map(str, b2)), 2)
-        bb3 = int(''.join(map(str, b3)), 2)
-        bb4 = int(''.join(map(str, b4)), 2)
+        bb0 = bin(int(''.join(map(str, b0)), 2))
+        bb1 = bin(int(''.join(map(str, b1)), 2))
+        bb2 = bin(int(''.join(map(str, b2)), 2))
+        bb3 = bin(int(''.join(map(str, b3)), 2))
+        bb4 = bin(int(''.join(map(str, b4)), 2))
 
         # Convert each binary value to hex
-        h0 = hex(bb0)
-        h1 = hex(bb1)
-        h2 = hex(bb2)
-        h3 = hex(bb3)
-        h4 = hex(bb4)
-
+        h0 = int(bb0, 2)
+        h1 = int(bb1, 2)
+        h2 = int(bb2, 2)
+        h3 = int(bb3, 2)
+        h4 = int(bb4, 2)
+        # print("rr: ", rr)
+        # print("gr: ", gr)
+        # print("br: ", br)
+        # print("binary byte 4: ", bb4)
+        # print("binary byte 3: ", bb3)
+        # print("binary byte 2: ", bb2)
+        # print("binary byte 1: ", bb1)
+        # print("binary byte 0: ", bb0)
+        # print("byte 4: ", b4)
+        # print("byte 3: ", b3)
+        # print("byte 2: ", b2)
+        # print("byte 1: ", b1)
+        # print("byte 0: ", b0)
+        # return [h0, h1, h2, h3, h4]
+        # return [1, 16, 0, 0, 0]
         return [h0, h1, h2, h3, h4]
     
 
@@ -302,23 +345,31 @@ class ECUController:
         self.init_drive_state()
 
     def process_button_pressed(self, index, init=False):
-        button_mapping = {
-            BUTTON_HAZARD: self.process_button_pressed_hazard,
-            BUTTON_PARK: self.process_button_pressed_park,
-            BUTTON_REVERSE: self.process_button_pressed_reverse,
-            BUTTON_NEUTRAL: self.process_button_pressed_neutral,
-            BUTTON_DRIVE: self.process_button_pressed_drive,
-            BUTTON_AUTOPILOT_SPEED_UP: self.process_button_pressed_autopilot_speed_up,
-            BUTTON_EXHAUST_SOUND: self.process_button_pressed_exhaust_sound,
-            BUTTON_F1: self.process_button_pressed_f1,
-            BUTTON_F2: self.process_button_pressed_f2,
-            BUTTON_REGEN: self.process_button_pressed_regen,
-            BUTTON_AUTOPILOT_ON: self.process_button_pressed_autopilot_on,
-            BUTTON_AUTOPILOT_SPEED_DOWN: self.process_button_pressed_autopilot_speed_down
-        }
-
         print("in process_button_pressed %i", index)
-        button_mapping.get(index, lambda: None)()
+        if index == BUTTON_HAZARD:
+            self.process_button_pressed_hazard()
+        if index == BUTTON_PARK:
+            self.process_button_pressed_park()
+        if index == BUTTON_REVERSE:
+            self.process_button_pressed_reverse()
+        if index == BUTTON_NEUTRAL:
+            self.process_button_pressed_neutral()
+        if index == BUTTON_DRIVE:
+            self.process_button_pressed_drive()
+        if index == BUTTON_AUTOPILOT_SPEED_UP:
+            self.process_button_pressed_autopilot_speed_up()
+        if index == BUTTON_EXHAUST_SOUND:
+            self.process_button_pressed_exhaust_sound()
+        if index == BUTTON_F1:
+            self.process_button_pressed_f1()
+        if index == BUTTON_F2:
+            self.process_button_pressed_f2()
+        if index == BUTTON_REGEN:
+            self.process_button_pressed_regen()
+        if index == BUTTON_AUTOPILOT_ON:
+            self.process_button_pressed_autopilot_on()
+        if index == BUTTON_AUTOPILOT_SPEED_DOWN:
+            self.process_button_pressed_autopilot_speed_down()
 
     def init_hazard(self):
         if self.ecu.hazard == ENABLED:
@@ -503,10 +554,12 @@ class ECU:
         return 0
 
 def decode_button_press(state):
-    b0, b1 = state[:2]
-    bay1 = [int(d) for d in bin((1 << 8) + b0)[-8:]]
-    bay2 = [int(d) for d in bin((1 << 8) + b1)[-4:]]
-    button_array = bay2 + bay1
+    int_values = [x for x in state]
+    b0 = int_values[0]
+    b1 = int_values[1]
+    bay1 = [int(d) for d in bin((1<<8)+b0)[-8:]]
+    bay2 = [int(d) for d in bin((1<<8)+b1)[-4:]]
+    button_array = bay2+bay1
     return button_array
 
 def toggle_warning_light(state):
@@ -519,51 +572,20 @@ def toggle_warning_light(state):
 def turn_off_warning_light():
     cm = CanMessage(0x215, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     message = cm.message()
-    application.can.send(message)
+    can.send(message)
     return False
 
 def turn_on_warning_light():
     cm = CanMessage(0x215, [0x02, 0x20, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00])
     message = cm.message()
-    application.can.send(message)
+    can.send(message)
     return True 
 
 def turn_off_all_lights():
     print("turning off all lights")
     cm = CanMessage(0x215, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     message = cm.message()
-    application.can.send(message)
-    
-class Application:
-    LISTEN_FOR = [canio.Match(0x195), canio.Match(0x595), canio.Match(0x715)] 
-    
-    def __init__(self, can = None, listener = None):
-        self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=125_000, auto_restart=False)
-        self.listener = self.can.listen(matches=Application.LISTEN_FOR, timeout=.1)
-        self.ecu = ECU()
-        self.pad = ControlPadView(self.can)
-        self.parking_break = ParkingBreak(board.D6, board.D9, board.D13, board.D11)
-        self.controller = ECUController(self.ecu, self.pad, self.parking_break)
-            
-    def new_controller(self):
-        self.pad = ControlPadView(self.can)
-        self.controller = ECUController(self.ecu, self.pad, self.parking_break)
-        
-    def send_baud_rate_upgrade_request(self):
-        # Request upgrade to 500_000 baud
-        upgrade_baud_rate_can_message = CanMessage(0x615, [0x2F, 0x10, 0x20, 0x00, 0x02, 0x00, 0x00, 0x00])
-        upgrade_baud_rate_message = upgrade_baud_rate_can_message.message()
-        self.can.send(upgrade_baud_rate_message)
-        
-    def upgrade_baud_rate(self):
-        self.can.deinit()
-        self.listener.deinit()
-        self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=500_000, auto_restart=True)
-        self.listener = self.can.listen(matches=Application.LISTEN_FOR, timeout=.1)
-        self.new_controller()
-
-    
-####### BEGIN MAIN PROGRAM FLOW ########
+    can.send(message)
 
 # If the CAN transceiver has a standby pin, bring it out of standby mode
 if hasattr(board, 'CAN_STANDBY'):
@@ -575,70 +597,81 @@ if hasattr(board, 'BOOST_ENABLE'):
     boost_enable = digitalio.DigitalInOut(board.BOOST_ENABLE)
     boost_enable.switch_to_output(True)
 
-        
-application = Application()
+# Use this line if your board has dedicated CAN pins. (Feather M4 CAN and Feather STM32F405)
+can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=125_000, auto_restart=True)
+# On ESP32S2 most pins can be used for CAN.  Uncomment the following line to use IO5 and IO6
+#can = canio.CAN(rx=board.IO6, tx=board.IO5, baudrate=250_000, auto_restart=True)
+listener = can.listen(matches=[canio.Match(0x195)], timeout=.1)
+
 keypad_awake = False
 demo_mode = False
 old_bus_state = None
 count = 0
 warning = False
-failed_attempts = 0
-MAX_FAILED_ATTEMPTS = 3  # you can adjust this value
+ecu = ECU()
+pad = ControlPadView(can)
+parking_break = ParkingBreak(board.D6, board.D9, board.D13, board.D11)
+controller = ECUController(ecu, pad, parking_break)
 
 while True:
-    bus_state = application.can.state
+    bus_state = can.state
     if bus_state != old_bus_state:
         old_bus_state = bus_state
 
-    if not keypad_awake:
+    if keypad_awake != True:
+        print("waiting for keypad to wake")
+        # time.sleep(3)
         print("init keypad")
         keypad_awake_message = CanMessage(0x0, [0x01])
         message = keypad_awake_message.message()
-        application.can.send(message)
-
-    message = application.listener.receive()
-    if message is None:
-        failed_attempts += 1
-        if failed_attempts >= MAX_FAILED_ATTEMPTS:
-            # Revert back to 125 kbps and attempt to promote again
-            application.init_can_and_test(baudrate=125_000)
-            application.send_baud_rate_upgrade_request()
-            failed_attempts = 0
-        continue
-    else:
-        failed_attempts = 0
+        can.send(message)
+        controller.init_start_state()
     
-    # Heartbeat Message 
-    if message.id == 0x715:
+    if keypad_awake == False:
         keypad_awake = True
-        application.controller.init_start_state()
-        application.send_upgrade_baud_rate_request()
-    elif message.id == 0x595:
-        print('upgrade baud rate to 500_000')
-        application.upgrade_baud_rate_connection()
-    elif message.id == 0x195:
-        button_pressed = decode_button_press(message.data)
+    
 
-        button_mapping = {
-            BUTTON_PRESSED_HAZARD: 'PRESSED_HAZARD',
-            BUTTON_PRESSED_PARK: 'PRESSED_PARK',
-            BUTTON_PRESSED_REVERSE: 'PRESSED_REVERSE',
-            BUTTON_PRESSED_NEUTRAL: 'PRESSED_NEUTRAL',
-            BUTTON_PRESSED_DRIVE: 'PRESSED_DRIVE',
-            BUTTON_PRESSED_AUTOPILOT_SPEED_UP: 'PRESSED_AUTOPILOT_SPEED_UP',
-            BUTTON_PRESSED_EXHAUST_SOUND: 'PRESSED_EXHAUST_SOUND',
-            BUTTON_PRESSED_F1: 'PRESSED_F1',
-            BUTTON_PRESSED_F2: 'PRESSED_F2',
-            BUTTON_PRESSED_REGEN: 'PRESSED_REGEN',
-            BUTTON_PRESSED_AUTOPILOT_ON: 'PRESSED_AUTOPILOT_ON',
-            BUTTON_PRESSED_AUTOPILOT_SPEED_DOWN: 'PRESSED_AUTOPILOT_SPEED_DOWN'
-        }
-        
-        for button, button_name in button_mapping.items():
-            if button_pressed[button]:
-                print(button_name)
-                application.controller.process_button_pressed(button)
-    else:
-        print(f"unknown message: [{message.id}] {message.data}")
-        
+    message = listener.receive()
+    if message is None:
+        continue
+
+    pressed_buttons = decode_button_press(message.data)
+
+    if pressed_buttons[BUTTON_PRESSED_HAZARD]:
+        print('PRESSED_HAZARD')
+        controller.process_button_pressed(BUTTON_HAZARD)
+    if pressed_buttons[BUTTON_PRESSED_PARK]:
+        print('PRESSED_PARK')
+        controller.process_button_pressed(BUTTON_PARK)
+    if pressed_buttons[BUTTON_PRESSED_REVERSE]:
+        print('PRESSED_REVERSE')
+        controller.process_button_pressed(BUTTON_REVERSE)
+    if pressed_buttons[BUTTON_PRESSED_NEUTRAL]:
+        print('PRESSED_NEUTRAL')
+        controller.process_button_pressed(BUTTON_NEUTRAL)
+    if pressed_buttons[BUTTON_PRESSED_DRIVE]:
+        print('PRESSED_DRIVE')
+        controller.process_button_pressed(BUTTON_DRIVE)
+    if pressed_buttons[BUTTON_PRESSED_AUTOPILOT_SPEED_UP]:
+        print('PRESSED_AUTOPILOT_SPEED_UP')
+        controller.process_button_pressed(BUTTON_AUTOPILOT_SPEED_UP)
+    if pressed_buttons[BUTTON_PRESSED_EXHAUST_SOUND]:
+        print('PRESSED_EXHAUST_SOUND')
+        controller.process_button_pressed(BUTTON_EXHAUST_SOUND)
+    if pressed_buttons[BUTTON_PRESSED_F1]:
+        print('PRESSED_F1')
+        controller.process_button_pressed(BUTTON_F1)
+    if pressed_buttons[BUTTON_PRESSED_F2]:
+        print('PRESSED_F2')
+        controller.process_button_pressed(BUTTON_F2)
+    if pressed_buttons[BUTTON_PRESSED_REGEN]:
+        print('PRESSED_REGEN')
+        controller.process_button_pressed(BUTTON_REGEN)
+    if pressed_buttons[BUTTON_PRESSED_AUTOPILOT_ON]:
+        print('PRESSED_AUTOPILOT_ON')
+        controller.process_button_pressed(BUTTON_AUTOPILOT_ON)
+    if pressed_buttons[BUTTON_PRESSED_AUTOPILOT_SPEED_DOWN]:
+        print('PRESSED_AUTOPILOT_SPEED_DOWN')
+        controller.process_button_pressed(BUTTON_AUTOPILOT_SPEED_DOWN)
+
     time.sleep(.1)
