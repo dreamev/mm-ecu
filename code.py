@@ -372,10 +372,10 @@ class Pad:
         return f"Pad(state={self.state})"
 
 
-class VehicleController
-    def __inican = can
+class VehicleController:
+    def __init(self, ecu, pad, parking_brake):
         self.ecu = ecu
-        eelf.pad = pad
+        self.pad = pad
         self.parking_brake = parking_brake
         self.init_drive_state()
 
@@ -405,7 +405,7 @@ class VehicleController
 
         button_id_to_action.get(index, lambda: print(f"No action defined for button ID: {index}"))() 
 
-    def set_button_color(self, button, color)
+    def set_button_color(self, button, color):
         Logger.debug("VehicleController.set_button_color")
         
         self.pad.update_color(PadButton.get_button_id(button), PadButton.get_color_code(color))
@@ -508,7 +508,7 @@ class Application:
     def __init__(self, can = None, listener = None):
         self.pad = Pad()
         self.ecu = ECU()
-        self.parking_brake = ParkingBrake(board.D9, board.D13, board.D11)
+        self.parking_brake = ParkingBrake(board.D6, board.D9, board.D13, board.D11)
         self.controller = VehicleController(self.ecu, self.pad, self.parking_brake)
         self.baud_rate = Application.EXPECTED_BAUD_RATE
         self.setup_can_connection(self.baud_rate)
