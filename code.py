@@ -97,10 +97,9 @@ class CanMessage:
             # If data is not a list, create a data payload of 8 bytes of 0x00
             self.data = bytes([0x00] * 8)
             
-        Logger.debug(f"CanMessage({self.id}, {self.data})")
-
     def message(self):
         Logger.trace(f"CanMessage.message")
+        
         return canio.Message(id=self.id, data=self.data)
     
 
@@ -147,18 +146,18 @@ class PadButton:
     }
 
     BUTTONS = {
-        "HAZARD": 0,
-        "PARK": 1,
-        "REVERSE": 2,
-        "NEUTRAL": 3,
-        "DRIVE": 4,
-        "AUTOPILOT_SPEED_UP": 5,
-        "EXHAUST_SOUND": 6,
-        "F1": 7,
-        "F2": 8,
-        "REGEN": 9,
-        "AUTOPILOT_ON": 10,
-        "AUTOPILOT_SPEED_DOWN": 11,
+        "HAZARD": 1,
+        "PARK": 2,
+        "REVERSE": 3,
+        "NEUTRAL": 4,
+        "DRIVE": 5,
+        "AUTOPILOT_SPEED_UP": 6,
+        "EXHAUST_SOUND": 7,
+        "F1": 8,
+        "F2": 9,
+        "REGEN": 10,
+        "AUTOPILOT_ON": 11,
+        "AUTOPILOT_SPEED_DOWN": 0,
     }
     
     COLOR_CODES = {
@@ -317,7 +316,7 @@ class Pad:
         elif self.state == PadState.BOOT_UP:
             pass
         else:
-            Logger.info("Transition to Boot-up is not allowed from", self.state)
+            Logger.info("Transition to Boot-up is not allowed from {self.state}")
 
     def to_operational(self):
         Logger.trace("Pad.to_operational")
@@ -328,7 +327,7 @@ class Pad:
         elif self.state == PadState.OPERATIONAL:
             pass
         else:
-            Logger.info("Transition to Operational is not allowed from", self.state)
+            Logger.info(f"Transition to Operational is not allowed from {self.state}")
 
     def reset(self):
         Logger.trace("Pad.reset")
@@ -352,6 +351,18 @@ class Pad:
         payload = self.rgb_matrix_to_hex(pad_matrix)
         
         return id, payload
+    
+    def can_is_heartbeat_boot_up(self, data):
+        heartbeat_bootup_data = bytes([0x00])
+        return heartbeat_bootup_data == data
+    
+    def can_is_heartbeat_pre_operational(self, data):
+        heartbeat_pre_operational_data = bytes([0x7f])
+        return heartbeat_pre_operational_data == data
+    
+    def can_is_heartbeat_operational(self, data):
+        heartbeat_operational_data = bytes([0x05])
+        return heartbeat_operational_data == data
     
     def update_color(self, index, color):
         Logger.trace("Pad.update_color")
@@ -572,9 +583,12 @@ class Application:
         
     def ensure_pad_operational(self):
         Logger.trace("Applcation.ensure_pad_operational")
-        
-        if self.pad.state == PadState.BOOT_UP or self.pad.state == PadState.UNKNOWN:
+       
+        if self.pad.state == PadState.UNKNOWN:
+            pass 
+        if self.pad.state == PadState.BOOT_UP:
             self.send_pad_activate()
+            self.pad.to_operational()
         elif self.pad.state == PadState.OPERATIONAL:
             pass
         else:
@@ -608,6 +622,7 @@ class Application:
         
         message = self.can_message_queue.pop()
         if message:
+            Logger.debug(f"Sending CAN message id: {message.id} data: {message.data}")
             self.can.send(message)
 
     def _process_message_based_on_id(self, message):
@@ -644,14 +659,14 @@ class Application:
         pressed_buttons = Pad.decode_button_press(message.data)
         
         for btn_name in button_names:
-            if pressed_buttons[Pad.get_pressed_button_id(btn_name)]:
+            if pressed_buttons[PadButton.get_pressed_button_id(btn_name)]:
                 Logger.info(f'PRESSED_{btn_name}')
       
 
 ####################
 ### Main Program ###
 ####################
-Logger.current_level = Logger.TRACE
+Logger.current_level = Logger.INFO
 Logger.info("INIT: Starting Feather M4")
 
 # If the CAN transceiver has a standby pin, bring it out of standby mode
