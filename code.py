@@ -219,6 +219,8 @@ class ECUState:
 
     
 class ECU:
+    DRIVE_SHIFT_ID = 0x697
+    
     def __init__(self):
         self.hazard = ECUState.ENABLED
         self.drive_state = ECUState.PARK
@@ -229,8 +231,54 @@ class ECU:
         self.target_cruise_speed = 0
         self.f1 = ECUState.DISABLED
         self.f2 = ECUState.DISABLED
+        self.can_message_queue = CanMessageQueue.get_instance()
+        
+    def set_hazard_lights(self, state):
+        self.hazard = state
 
+    def set_exhaust_sound(self, state):
+        self.exhaust_sound = state
+
+    def set_f1(self, state):
+        self.f1 = state
+
+    def set_f2(self, state):
+        self.f2 = state
+
+    def set_drive_state(self, state):
+        self.drive_state = state
+
+    def set_power_state(self, state):
+        self.power_state = state
+
+    def set_regen_state(self, state):
+        self.regen_state = state
+
+    def set_cruise_state(self, state):
+        self.cruise_state = state
+        if state == ECUState.ENABLED:
+            self.target_cruise_speed = self.get_current_speed()
+
+    def modify_cruise_speed(self, modifier):
+        self.target_cruise_speed += modifier
+
+    def get_current_speed(self):
+        Logger.trace("ECU.get_current_speed")
+        
+        return 0
     
+    def can_drive_state_command(self, state):
+        Logger.trace("ECU.can_drive_state_command")
+        
+        can_data = {
+            ECUState.DRIVE: [0x0d, 0xbe, 0xef],
+            ECUState.NEUTRAL: [0x0e, 0xbe, 0xef],
+            ECUState.REVERSE: [0x0f, 0xbe, 0xef],
+        }
+            
+        data = can_data.get(state, lambda: Logger.info(f"No data for drivestate command {state}"))()
+        self.can_message_queue.push_with_id(ECU.DRIVE_SHIFT_ID, data)
+        
     
 class ParkingBrake:
     def __init__(self, engaged_pin, disengaged_pin, engage_pin, disengage_pin):
@@ -248,46 +296,51 @@ class ParkingBrake:
         self.trigger_disengage_pin = digitalio.DigitalInOut(disengage_pin)
         self.trigger_disengage_pin.direction = digitalio.Direction.OUTPUT
         
-        self.engaged = False
+        self.engaged = ECUState.DISABLED
         self.init_current_state()
         
     def init_current_state(self):
         Logger.trace("ParkingBrake.init_current_state")
         
         if self.sensor_engaged_pin.value:
-            self.engaged = True
-            self.trigger_engage_pin.value = True
-            self.trigger_disengage_pin.value = False
+            Logger.info("ParkingBrake Engaged")
+            
+            self.engage()
         elif self.sensor_disengaged_pin.value:
-            self.engaged = False
-            self.trigger_engage_pin.value = False
-            self.trigger_disengage_pin.value = True
+            Logger.info("ParkingBrake Disengaged")
+            
+            self.disengage()
         else:
             Logger.error("shit's weird, bro")      
 
     def is_engaged(self):
         Logger.trace("ParkingBrake.is_engaged")
+        
         return self.engaged
       
     def engage(self):
         Logger.trace("ParkingBrake.engage")
         
         if not self.engaged:
-            self.trigger_disengage_pin.value = False
-            self.trigger_engage_pin.value = True
-            self.engaged = True
+            self.trigger_disengage_pin.value = ECUState.DISABLED
+            self.trigger_engage_pin.value = ECUState.ENABLED
+            self.engaged = ECUState.ENABLED
        
     def disengage(self):
         Logger.trace("ParkingBrake.disengage")
         
         if self.engaged:
-            self.trigger_engage_pin.value = False
-            self.trigger_disengage_pin.value = True
-            self.engaged = False
+            self.trigger_engage_pin.value = ECUState.DISABLED
+            self.trigger_disengage_pin.value = ECUState.ENABLED
+            self.engaged = ECUState.DISABLED
             
     def toggle(self):
         Logger.trace("ParkingBrake.toggle")
-        self.engaged = not self.engaged 
+        
+        if self.engaged:
+            self.disengage()
+        else:
+            self.engage()
 
 
 class PadState:
@@ -310,13 +363,13 @@ class Pad:
     def to_boot_up(self):
         Logger.trace("Pad.to_boot_up")
         
-        if self.state == PadState.UNKNOWN:
+        if self.state == PadState.UNKNOWN or self.state == PadState.OPERATIONAL:
             self.state = PadState.BOOT_UP
             Logger.info("Pad is now in Boot up.")
         elif self.state == PadState.BOOT_UP:
             pass
         else:
-            Logger.info("Transition to Boot-up is not allowed from {self.state}")
+            Logger.info(f"Transition to Boot-up is not allowed from {self.state}")
 
     def to_operational(self):
         Logger.trace("Pad.to_operational")
@@ -462,6 +515,7 @@ class VehicleController:
             for button in PadButton.get_button_names()
         }
 
+        # TODO: This is where we're stuck. Not getting a lookup of a button ID to a function
         button_id_to_action.get(index, lambda: Logger.info(f"No action defined for button ID: {index}"))() 
 
     def set_button_color(self, button, color):
@@ -503,21 +557,25 @@ class VehicleController:
         Logger.trace("VehicleController.process_button_pressed_park")  
         
         self.process_button_drive_change(ECUState.PARK, 'PARK')
+        self.parking_brake.engage()
         
     def process_button_pressed_reverse(self):
         Logger.trace("VehicleController.process_button_pressed_reverse")  
         
         self.process_button_drive_change(ECUState.REVERSE, 'REVERSE')
+        self.ecu.can_drive_state_command(ECUState.REVERSE)
         
     def process_button_pressed_neutral(self):
         Logger.trace("VehicleController.process_button_pressed_neutral")  
         
         self.process_button_drive_change(ECUState.NEUTRAL, 'NEUTRAL')
+        self.ecu.set_drive_state(ECUState.NEUTRAL)
          
     def process_button_pressed_drive(self):
         Logger.trace("VehicleController.process_button_pressed_drive") 
         
         self.process_button_drive_change(ECUState.DRIVE, 'DRIVE')
+        self.ecu.set_drive_state(ECUState.DRIVE)
 
     def process_button_pressed_exhaust_sound(self):
         Logger.trace("VehicleController.process_button_pressed_exhaust_sound")
@@ -660,7 +718,8 @@ class Application:
         
         for btn_name in button_names:
             if pressed_buttons[PadButton.get_pressed_button_id(btn_name)]:
-                Logger.info(f'PRESSED_{btn_name}')
+                Logger.debug(f'PRESSED_{btn_name}')
+                self.controller.process_button_pressed(btn_name)
       
 
 ####################
