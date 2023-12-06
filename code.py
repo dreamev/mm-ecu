@@ -127,7 +127,6 @@ class CanMessageQueue:
         Logger.trace("CanMessageQueue.pop")
         if self.queue:
             queue_message = self.queue.pop(0)
-            Logger.debug(f"CanMessageQueue.pop {queue_message}")
             
             return queue_message
         return None
@@ -376,7 +375,7 @@ class Pad:
         
         if self.state == PadState.BOOT_UP:
             self.state = PadState.OPERATIONAL
-            Logger.info("Pad is now Operational.")
+            Logger.info("Pad is transitioning to Operational.")
         elif self.state == PadState.OPERATIONAL:
             pass
         else:
@@ -484,24 +483,25 @@ class Pad:
 
 
 class VehicleController:
-    def __init(self, ecu, pad, parking_brake):
+    def __init__(self, ecu, pad, parking_brake):
         self.ecu = ecu
         self.pad = pad
         self.parking_brake = parking_brake
-        self.init_drive_state()
 
     def init_drive_state(self):
         Logger.trace("VehicleController.init_drive_state")
         
+        Logger.debug("Initializing drive state")
+        
         button_state = {
-            "DRIVE": PadButton.get_color_code("blue") if self.parking_brake.is_engaged() else PadButton.get_color_code("black"),
-            "REVERSE": PadButton.get_color_code("black"),
-            "NEUTRAL": PadButton.get_color_code("black")
+            "DRIVE": "blue" if self.parking_brake.is_engaged() else "black",
+            "REVERSE": "black",
+            "NEUTRAL": "black"
         }
 
         if self.parking_brake.is_engaged():
             Logger.debug("  Parking brake is engaged")
-            self.ecu.set_state(ECUState.PARK, ECUState.ENABLED)
+            self.ecu.set_drive_state(ECUState.PARK)
             self.parking_brake.engage() 
 
         for button, color in button_state.items():
@@ -647,6 +647,7 @@ class Application:
         if self.pad.state == PadState.BOOT_UP:
             self.send_pad_activate()
             self.pad.to_operational()
+            self.controller.init_drive_state()
         elif self.pad.state == PadState.OPERATIONAL:
             pass
         else:
@@ -725,7 +726,7 @@ class Application:
 ####################
 ### Main Program ###
 ####################
-Logger.current_level = Logger.INFO
+Logger.current_level = Logger.DEBUG
 Logger.info("INIT: Starting Feather M4")
 
 # If the CAN transceiver has a standby pin, bring it out of standby mode
