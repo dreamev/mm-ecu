@@ -135,7 +135,7 @@ class CanMessageQueue:
 class PadButton:
     COLORS = {
         "red": (1, 0, 0),
-        "blue": (0, 1, 0),
+        "blue": (0, 0, 1),
         "green": (0, 1, 0),
         "magenta": (1, 0, 1),
         "cyan": (0, 1, 1),
@@ -193,12 +193,12 @@ class PadButton:
         self.red = self.green = self.blue = 0
 
     def change_color(self, color):
-        Logger.trace("PadButton::change_color")
+        Logger.trace("PadButton.change_color")
         
         color_values = self.COLORS.get(color)  
 
         if color_values:
-            Logger.info(f"Changing color to {color}")
+            Logger.debug(f"Changing id {self.id} to color {color} with color_values {color_values}")
             self.red, self.green, self.blue = color_values
         else:
             Logger.info("Invalid color")
@@ -356,7 +356,7 @@ class Pad:
     
     def __init__(self):
         self.state = PadState.UNKNOWN
-        self.buttons = [PadButton(id) for name, id in PadButton.BUTTONS.items()]
+        self.buttons = sorted([PadButton(id) for name, id in PadButton.BUTTONS.items()], key=lambda button: button.id)
         self.can_message_queue = CanMessageQueue.get_instance()
         
     def to_boot_up(self):
@@ -466,8 +466,10 @@ class Pad:
         h2 = int(bb2, 2)
         h3 = int(bb3, 2)
         h4 = int(bb4, 2)
-
-        return [h0, h1, h2, h3, h4]
+        
+        hex_matrix = [h0, h1, h2, h3, h4]
+        Logger.debug(f"rgb_matrix: {hex_matrix}")
+        return hex_matrix
     
     def decode_button_press(state):
         int_values = [x for x in state]
@@ -505,18 +507,26 @@ class VehicleController:
             self.parking_brake.engage() 
 
         for button, color in button_state.items():
-            self.pad.update_color(PadButton.get_button_id(button), color)
+            button_id = PadButton.get_button_id(button)
+            Logger.debug(f"  Attempting to set button {button_id} to color {color}")
+            self.pad.update_color(button_id, color)
 
     def process_button_pressed(self, index):
         Logger.trace("VehicleController.process_button_pressed")
         
         button_id_to_action = {
-            PadButton.get_button_id(button): getattr(self, f'process_button_pressed_{button.lower()}')
-            for button in PadButton.get_button_names()
+            button_id: f'process_button_pressed_{button.lower()}'
+            for button, button_id in PadButton.BUTTONS.items()
         }
+        
+        action = button_id_to_action.get(index)
+        
+        if action:
+            action_function = getattr(self, action)
+            action_function()
+        else:
+            Logger.info(f"No action defined for button ID: {index}")
 
-        # TODO: This is where we're stuck. Not getting a lookup of a button ID to a function
-        button_id_to_action.get(index, lambda: Logger.info(f"No action defined for button ID: {index}"))() 
 
     def set_button_color(self, button, color):
         Logger.trace("VehicleController.set_button_color")
@@ -557,25 +567,25 @@ class VehicleController:
         Logger.trace("VehicleController.process_button_pressed_park")  
         
         self.process_button_drive_change(ECUState.PARK, 'PARK')
-        self.parking_brake.engage()
+        # self.parking_brake.engage()
         
     def process_button_pressed_reverse(self):
         Logger.trace("VehicleController.process_button_pressed_reverse")  
         
         self.process_button_drive_change(ECUState.REVERSE, 'REVERSE')
-        self.ecu.can_drive_state_command(ECUState.REVERSE)
+        # self.ecu.can_drive_state_command(ECUState.REVERSE)
         
     def process_button_pressed_neutral(self):
         Logger.trace("VehicleController.process_button_pressed_neutral")  
         
         self.process_button_drive_change(ECUState.NEUTRAL, 'NEUTRAL')
-        self.ecu.set_drive_state(ECUState.NEUTRAL)
+        # self.ecu.set_drive_state(ECUState.NEUTRAL)
          
     def process_button_pressed_drive(self):
         Logger.trace("VehicleController.process_button_pressed_drive") 
         
         self.process_button_drive_change(ECUState.DRIVE, 'DRIVE')
-        self.ecu.set_drive_state(ECUState.DRIVE)
+        # self.ecu.set_drive_state(ECUState.DRIVE)
 
     def process_button_pressed_exhaust_sound(self):
         Logger.trace("VehicleController.process_button_pressed_exhaust_sound")
@@ -585,23 +595,24 @@ class VehicleController:
     def process_button_pressed_f1(self):
         Logger.trace("VehicleController.process_button_pressed_f1")
         
-        self.ecu.set_f1(ECUState.ENABLED)
+        # self.ecu.set_f1(ECUState.ENABLED)
         self.set_button_color('F1', 'cyan')
-        self.ecu.set_f2(ECUState.DISABLED)
+        # self.ecu.set_f2(ECUState.DISABLED)
         self.set_button_color('F2', 'black')
 
     def process_button_pressed_f2(self):
         Logger.trace("VehicleController.process_button_pressed_f2")
         
-        self.ecu.set_f2(ECUState.ENABLED)
+        # self.ecu.set_f2(ECUState.ENABLED)
         self.set_button_color('F2', 'yellow')
-        self.ecu.set_f1(ECUState.DISABLED)
+        # self.ecu.set_f1(ECUState.DISABLED)
         self.set_button_color('F1', 'black')
 
     def process_button_pressed_regen(self):
         Logger.trace("VehicleController.process_button_pressed_regen")
         
-        self.switch_device_state('regen_state', 'REGEN')
+        # self.switch_device_state('regen_state', 'REGEN')
+        pass
 
     def process_button_pressed_autopilot_on(self):
         Logger.trace("VehicleController.process_button_pressed_autopilot_on")
@@ -718,9 +729,10 @@ class Application:
         pressed_buttons = Pad.decode_button_press(message.data)
         
         for btn_name in button_names:
-            if pressed_buttons[PadButton.get_pressed_button_id(btn_name)]:
+            button_id = PadButton.get_button_id(btn_name)
+            if pressed_buttons[button_id]:
                 Logger.debug(f'PRESSED_{btn_name}')
-                self.controller.process_button_pressed(btn_name)
+                self.controller.process_button_pressed(button_id)
       
 
 ####################
