@@ -145,31 +145,20 @@ class PadButton:
     }
 
     BUTTONS = {
-        "HAZARD": 1,
-        "PARK": 2,
-        "REVERSE": 3,
-        "NEUTRAL": 4,
-        "DRIVE": 5,
+        "HAZARD": 11,
+        "PARK": 10,
+        "REVERSE": 9,
+        "NEUTRAL": 8,
+        "DRIVE": 7,
         "AUTOPILOT_SPEED_UP": 6,
-        "EXHAUST_SOUND": 7,
-        "F1": 8,
-        "F2": 9,
-        "REGEN": 10,
-        "AUTOPILOT_ON": 11,
+        "EXHAUST_SOUND": 5,
+        "F1": 4,
+        "F2": 3,
+        "REGEN": 2,
+        "AUTOPILOT_ON": 1,
         "AUTOPILOT_SPEED_DOWN": 0,
     }
     
-    COLOR_CODES = {
-        "red" : 100,
-        "blue" : 101,
-        "green" : 102,
-        "magenta" : 103,
-        "yellow" : 104,
-        "cyan" : 105,
-        "white" : 106,
-        "black" : 107
-    }
-
     @classmethod
     def get_button_id(cls, button):
         return cls.BUTTONS.get(button)
@@ -177,13 +166,8 @@ class PadButton:
     @classmethod
     def get_pressed_button_id(cls, button):
         button_id = cls.BUTTONS.get(button)
-        return -button_id if button_id is not None else None
+        return button_id if button_id is not None else None
 
-    @classmethod
-    def get_color_code(cls, color):
-        color_code = cls.COLOR_CODES.get(color)
-        return -color_code if color_code is not None else None
-    
     @classmethod
     def get_button_names(cls):
         return list(cls.BUTTONS.keys())    
@@ -274,10 +258,14 @@ class ECU:
             ECUState.NEUTRAL: [0x0e, 0xbe, 0xef],
             ECUState.REVERSE: [0x0f, 0xbe, 0xef],
         }
-            
-        data = can_data.get(state, lambda: Logger.info(f"No data for drivestate command {state}"))()
-        self.can_message_queue.push_with_id(ECU.DRIVE_SHIFT_ID, data)
         
+        data = can_data.get(state, None)  # Set default value to None
+        if data is not None:
+            Logger.debug(f"Sending drive state command {state} with data {data}")
+            self.can_message_queue.push_with_id(ECU.DRIVE_SHIFT_ID, data)
+        else:
+            Logger.info(f"No data for drivestate command {state}")
+
     
 class ParkingBrake:
     def __init__(self, engaged_pin, disengaged_pin, engage_pin, disengage_pin):
@@ -531,15 +519,15 @@ class VehicleController:
     def set_button_color(self, button, color):
         Logger.trace("VehicleController.set_button_color")
         
-        self.pad.update_color(PadButton.get_button_id(button), PadButton.get_color_code(color))
+        self.pad.update_color(PadButton.get_button_id(button), color)
 
     def switch_device_state(self, device, button):
         Logger.trace("VehicleController.switch_device_state")  
         
         state = getattr(self.ecu, device)
-        new_state = ECUState.ENALBED if state == ECUState.DISABLED else ECUState.DISABLED
+        new_state = ECUState.ENABLED if state == ECUState.DISABLED else ECUState.DISABLED
+        Logger.debug(f"Switching device state {new_state}")
         color = 'yellow' if new_state == ECUState.ENABLED else 'black'
-        self.ecu.set_device_state(device, new_state)
         self.set_button_color(button, color)
 
     def process_button_pressed_hazard(self):
@@ -567,25 +555,26 @@ class VehicleController:
         Logger.trace("VehicleController.process_button_pressed_park")  
         
         self.process_button_drive_change(ECUState.PARK, 'PARK')
-        # self.parking_brake.engage()
+        # self.ecu.can_drive_state_command(ECUState.NEUTRAL)
+        self.parking_brake.engage()
         
     def process_button_pressed_reverse(self):
         Logger.trace("VehicleController.process_button_pressed_reverse")  
         
         self.process_button_drive_change(ECUState.REVERSE, 'REVERSE')
-        # self.ecu.can_drive_state_command(ECUState.REVERSE)
+        self.ecu.can_drive_state_command(ECUState.REVERSE)
         
     def process_button_pressed_neutral(self):
         Logger.trace("VehicleController.process_button_pressed_neutral")  
         
         self.process_button_drive_change(ECUState.NEUTRAL, 'NEUTRAL')
-        # self.ecu.set_drive_state(ECUState.NEUTRAL)
+        self.ecu.can_drive_state_command(ECUState.NEUTRAL)
          
     def process_button_pressed_drive(self):
         Logger.trace("VehicleController.process_button_pressed_drive") 
         
         self.process_button_drive_change(ECUState.DRIVE, 'DRIVE')
-        # self.ecu.set_drive_state(ECUState.DRIVE)
+        self.ecu.can_drive_state_command(ECUState.DRIVE)
 
     def process_button_pressed_exhaust_sound(self):
         Logger.trace("VehicleController.process_button_pressed_exhaust_sound")
@@ -731,7 +720,7 @@ class Application:
         for btn_name in button_names:
             button_id = PadButton.get_button_id(btn_name)
             if pressed_buttons[button_id]:
-                Logger.debug(f'PRESSED_{btn_name}')
+                Logger.debug(f'PRESSED_{btn_name} / {button_id}')
                 self.controller.process_button_pressed(button_id)
       
 
