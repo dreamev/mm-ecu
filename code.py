@@ -262,7 +262,9 @@ class ECU:
         data = can_data.get(state, None)  # Set default value to None
         if data is not None:
             Logger.debug(f"Sending drive state command {state} with data {data}")
-            self.can_message_queue.push_with_id(ECU.DRIVE_SHIFT_ID, data)
+            # Send the command 4 times to ensure it is received
+            for _ in range(4):
+                self.can_message_queue.push_with_id(ECU.DRIVE_SHIFT_ID, data)
         else:
             Logger.info(f"No data for drivestate command {state}")
 
@@ -344,8 +346,16 @@ class Pad:
     
     def __init__(self):
         self.state = PadState.UNKNOWN
-        self.buttons = sorted([PadButton(id) for name, id in PadButton.BUTTONS.items()], key=lambda button: button.id)
+        self.buttons = sorted([PadButton(id) for name, id in PadButton.BUTTONS.items()], key=lambda button: -button.id)
         self.can_message_queue = CanMessageQueue.get_instance()
+        
+    def get_button_index_from_id(self, id):
+        Logger.trace("Pad.get_button_index_from_id")
+        
+        for index, button in enumerate(self.buttons):
+            if button.id == id:
+                return index
+        return None  # Return None if the button ID is not found        
         
     def to_boot_up(self):
         Logger.trace("Pad.to_boot_up")
@@ -404,11 +414,12 @@ class Pad:
         heartbeat_operational_data = bytes([0x05])
         return heartbeat_operational_data == data
     
-    def update_color(self, index, color):
+    def update_color(self, button_id, color):
         Logger.trace("Pad.update_color")
         
-        Logger.info(f"updating color for {index} to {color}")
-        self.buttons[index].change_color(color)
+        Logger.info(f"updating color for button ID {button_id} to color {color}")
+        button_index = self.get_button_index_from_id(button_id)
+        self.buttons[button_index].change_color(color)
         id, data = self.can_refresh_button_colors()
         self.can_message_queue.push_with_id(id, data)
         
