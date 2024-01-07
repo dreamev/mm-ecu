@@ -1,12 +1,12 @@
 # HEYOO!  Links
-# 
+#
 # Adafruit Feather
 # https://www.adafruit.com/product/4759
-# 
+#
 # Circut py
 # https://circuitpython.readthedocs.io/projects/bundle/en/latest/drivers.html
-# 
-# Blink Marine 12 Button Keypad 
+#
+# Blink Marine 12 Button Keypad
 #   datasheet
 #   https://ss-usa.s3.amazonaws.com/c/308474458/media/1417060ec085e997cc28740285766947/PKP-2600-SI%20Datasheet.pdf
 #   Can Manual
@@ -22,6 +22,7 @@ import time
 import board
 import canio
 import digitalio
+
 
 class FeatherSettings:
     CAN_REFRESH_RATE = 0.5
@@ -76,13 +77,14 @@ class Logger:
     @classmethod
     def debug(cls, message):
         cls.log(cls.DEBUG, message)
-        
+
     @classmethod
     def trace(cls, message):
         cls.log(cls.TRACE, message)
 
-    
+
 class CanMessage:
+
     def __init__(self, id, data):
         self.id = id
         # Ensure that data is a list of length 8, padded with 0x00 if necessary
@@ -96,16 +98,16 @@ class CanMessage:
         else:
             # If data is not a list, create a data payload of 8 bytes of 0x00
             self.data = bytes([0x00] * 8)
-            
+
     def message(self):
         Logger.trace(f"CanMessage.message")
-        
+
         return canio.Message(id=self.id, data=self.data)
-    
+
 
 class CanMessageQueue:
     _instance = None
-    
+
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
@@ -114,24 +116,24 @@ class CanMessageQueue:
 
     def __init__(self):
         self.queue = []
-        
+
     def push_with_id(self, id, data):
         Logger.trace("CanMessageQueue.push_with_id")
         self.push(CanMessage(id, data).message())
-        
+
     def push(self, message):
         Logger.trace("CanMessageQueue.push")
         self.queue.append(message)
-        
+
     def pop(self):
         Logger.trace("CanMessageQueue.pop")
         if self.queue:
             queue_message = self.queue.pop(0)
-            
+
             return queue_message
         return None
 
-    
+
 class PadButton:
     COLORS = {
         "red": (1, 0, 0),
@@ -158,7 +160,7 @@ class PadButton:
         "AUTOPILOT_ON": 1,
         "AUTOPILOT_SPEED_DOWN": 0,
     }
-    
+
     @classmethod
     def get_button_id(cls, button):
         return cls.BUTTONS.get(button)
@@ -170,7 +172,7 @@ class PadButton:
 
     @classmethod
     def get_button_names(cls):
-        return list(cls.BUTTONS.keys())    
+        return list(cls.BUTTONS.keys())
 
     def __init__(self, id):
         self.id = id
@@ -178,15 +180,15 @@ class PadButton:
 
     def change_color(self, color):
         Logger.trace("PadButton.change_color")
-        
-        color_values = self.COLORS.get(color)  
+
+        color_values = self.COLORS.get(color)
 
         if color_values:
             Logger.debug(f"Changing id {self.id} to color {color} with color_values {color_values}")
             self.red, self.green, self.blue = color_values
         else:
             Logger.info("Invalid color")
-            
+
         return self
 
 
@@ -196,14 +198,14 @@ class ECUState:
     PARK = 0
     REVERSE = 1
     NEUTRAL = 2
-    DRIVE = 3 
+    DRIVE = 3
     HIGH_POWER = 1
     LOW_POWER = 0
 
-    
+
 class ECU:
     DRIVE_SHIFT_ID = 0x697
-    
+
     def __init__(self):
         self.hazard = ECUState.ENABLED
         self.drive_state = ECUState.PARK
@@ -215,7 +217,7 @@ class ECU:
         self.f1 = ECUState.DISABLED
         self.f2 = ECUState.DISABLED
         self.can_message_queue = CanMessageQueue.get_instance()
-        
+
     def set_hazard_lights(self, state):
         self.hazard = state
 
@@ -247,18 +249,18 @@ class ECU:
 
     def get_current_speed(self):
         Logger.trace("ECU.get_current_speed")
-        
+
         return 0
-    
+
     def can_drive_state_command(self, state):
         Logger.trace("ECU.can_drive_state_command")
-        
+
         can_data = {
             ECUState.DRIVE: [0x0d, 0xbe, 0xef],
             ECUState.NEUTRAL: [0x0e, 0xbe, 0xef],
             ECUState.REVERSE: [0x0f, 0xbe, 0xef],
         }
-        
+
         data = can_data.get(state, None)  # Set default value to None
         if data is not None:
             Logger.debug(f"Sending drive state command {state} with data {data}")
@@ -268,64 +270,65 @@ class ECU:
         else:
             Logger.info(f"No data for drivestate command {state}")
 
-    
+
 class ParkingBrake:
+
     def __init__(self, engaged_pin, disengaged_pin, engage_pin, disengage_pin):
         self.sensor_engaged_pin = digitalio.DigitalInOut(engaged_pin)
         self.sensor_engaged_pin.direction = digitalio.Direction.INPUT
         self.sensor_engaged_pin.pull = digitalio.Pull.UP
-        
+
         self.sensor_disengaged_pin = digitalio.DigitalInOut(disengaged_pin)
         self.sensor_disengaged_pin.direction = digitalio.Direction.INPUT
         self.sensor_disengaged_pin.pull = digitalio.Pull.UP
 
         self.trigger_engage_pin = digitalio.DigitalInOut(engage_pin)
         self.trigger_engage_pin.direction = digitalio.Direction.OUTPUT
-        
+
         self.trigger_disengage_pin = digitalio.DigitalInOut(disengage_pin)
         self.trigger_disengage_pin.direction = digitalio.Direction.OUTPUT
-        
+
         self.engaged = ECUState.DISABLED
         self.init_current_state()
-        
+
     def init_current_state(self):
         Logger.trace("ParkingBrake.init_current_state")
-        
+
         if self.sensor_engaged_pin.value:
             Logger.info("ParkingBrake Engaged")
-            
+
             self.engage()
         elif self.sensor_disengaged_pin.value:
             Logger.info("ParkingBrake Disengaged")
-            
+
             self.disengage()
         else:
-            Logger.error("shit's weird, bro")      
+            Logger.error("shit's weird, bro")
 
     def is_engaged(self):
         Logger.trace("ParkingBrake.is_engaged")
-        
+
         return self.engaged
-      
+
     def engage(self):
         Logger.trace("ParkingBrake.engage")
-        
+
         if not self.engaged:
             self.trigger_disengage_pin.value = ECUState.DISABLED
             self.trigger_engage_pin.value = ECUState.ENABLED
             self.engaged = ECUState.ENABLED
-       
+
     def disengage(self):
         Logger.trace("ParkingBrake.disengage")
-        
+
         if self.engaged:
             self.trigger_engage_pin.value = ECUState.DISABLED
             self.trigger_disengage_pin.value = ECUState.ENABLED
             self.engaged = ECUState.DISABLED
-            
+
     def toggle(self):
         Logger.trace("ParkingBrake.toggle")
-        
+
         if self.engaged:
             self.disengage()
         else:
@@ -337,29 +340,29 @@ class PadState:
     BOOT_UP = "Boot-up"
     PRE_OPERATIONAL = "Pre-operational"
     OPERATIONAL = "Operational"
- 
- 
+
+
 class Pad:
     HEARTBEAT_ID = 0x715
     BUTTON_EVENT_ID = 0x195
     COLOR_REFRESH_ID = 0x215
-    
+
     def __init__(self):
         self.state = PadState.UNKNOWN
-        self.buttons = sorted([PadButton(id) for name, id in PadButton.BUTTONS.items()], key=lambda button: -button.id)
+        self.buttons = sorted([PadButton(id) for name, id in PadButton.BUTTONS.items()], key=lambda button:-button.id)
         self.can_message_queue = CanMessageQueue.get_instance()
-        
+
     def get_button_index_from_id(self, id):
         Logger.trace("Pad.get_button_index_from_id")
-        
+
         for index, button in enumerate(self.buttons):
             if button.id == id:
                 return index
-        return None  # Return None if the button ID is not found        
-        
+        return None  # Return None if the button ID is not found
+
     def to_boot_up(self):
         Logger.trace("Pad.to_boot_up")
-        
+
         if self.state == PadState.UNKNOWN or self.state == PadState.OPERATIONAL:
             self.state = PadState.BOOT_UP
             Logger.info("Pad is now in Boot up.")
@@ -370,7 +373,7 @@ class Pad:
 
     def to_operational(self):
         Logger.trace("Pad.to_operational")
-        
+
         if self.state == PadState.BOOT_UP:
             self.state = PadState.OPERATIONAL
             Logger.info("Pad is transitioning to Operational.")
@@ -381,48 +384,48 @@ class Pad:
 
     def reset(self):
         Logger.trace("Pad.reset")
-        
+
         self.state = PadState.UNKNOWN
         Logger.info("Pad has been reset to Unknown state.")
-        
+
     def can_activate_keypad(self):
         Logger.trace("Pad.can_activate_keypad")
-        
+
         id = 0x0
         data = [0x01]
-        
+
         return id, data
-        
+
     def can_refresh_button_colors(self):
         Logger.trace("Pad.can_refresh_button_colors")
-        
+
         id = 0x215
         pad_matrix = self.rgb_matrices()
         payload = self.rgb_matrix_to_hex(pad_matrix)
-        
+
         return id, payload
-    
+
     def can_is_heartbeat_boot_up(self, data):
         heartbeat_bootup_data = bytes([0x00])
         return heartbeat_bootup_data == data
-    
+
     def can_is_heartbeat_pre_operational(self, data):
         heartbeat_pre_operational_data = bytes([0x7f])
         return heartbeat_pre_operational_data == data
-    
+
     def can_is_heartbeat_operational(self, data):
         heartbeat_operational_data = bytes([0x05])
         return heartbeat_operational_data == data
-    
+
     def update_color(self, button_id, color):
         Logger.trace("Pad.update_color")
-        
+
         Logger.info(f"updating color for button ID {button_id} to color {color}")
         button_index = self.get_button_index_from_id(button_id)
         self.buttons[button_index].change_color(color)
         id, data = self.can_refresh_button_colors()
         self.can_message_queue.push_with_id(id, data)
-        
+
     def rgb_matrices(self):
         i = 0
         pad_rgb_matrix = [
@@ -432,7 +435,7 @@ class Pad:
         ]
 
         for button in self.buttons[0:12]:
-            pad_rgb_matrix[0][i] = button.red 
+            pad_rgb_matrix[0][i] = button.red
             pad_rgb_matrix[1][i] = button.green
             pad_rgb_matrix[2][i] = button.blue
             i = i + 1
@@ -465,25 +468,26 @@ class Pad:
         h2 = int(bb2, 2)
         h3 = int(bb3, 2)
         h4 = int(bb4, 2)
-        
+
         hex_matrix = [h0, h1, h2, h3, h4]
         Logger.debug(f"rgb_matrix: {hex_matrix}")
         return hex_matrix
-    
-    def decode_button_press(state):
+
+    def decode_button_press(self, state):
         int_values = [x for x in state]
         b0 = int_values[0]
         b1 = int_values[1]
-        bay1 = [int(d) for d in bin((1<<8)+b0)[-8:]]
-        bay2 = [int(d) for d in bin((1<<8)+b1)[-4:]]
-        button_array = bay2+bay1
-        return button_array 
-        
+        bay1 = [int(d) for d in bin((1 << 8) + b0)[-8:]]
+        bay2 = [int(d) for d in bin((1 << 8) + b1)[-4:]]
+        button_array = bay2 + bay1
+        return button_array
+
     def __str__(self):
         return f"Pad(state={self.state})"
 
 
 class VehicleController:
+
     def __init__(self, ecu, pad, parking_brake):
         self.ecu = ecu
         self.pad = pad
@@ -491,9 +495,9 @@ class VehicleController:
 
     def init_drive_state(self):
         Logger.trace("VehicleController.init_drive_state")
-        
+
         Logger.debug("Initializing drive state")
-        
+
         button_state = {
             "DRIVE": "blue" if self.parking_brake.is_engaged() else "black",
             "REVERSE": "black",
@@ -503,7 +507,7 @@ class VehicleController:
         if self.parking_brake.is_engaged():
             Logger.debug("  Parking brake is engaged")
             self.ecu.set_drive_state(ECUState.PARK)
-            self.parking_brake.engage() 
+            self.parking_brake.engage()
 
         for button, color in button_state.items():
             button_id = PadButton.get_button_id(button)
@@ -512,29 +516,28 @@ class VehicleController:
 
     def process_button_pressed(self, index):
         Logger.trace("VehicleController.process_button_pressed")
-        
+
         button_id_to_action = {
             button_id: f'process_button_pressed_{button.lower()}'
             for button, button_id in PadButton.BUTTONS.items()
         }
-        
+
         action = button_id_to_action.get(index)
-        
+
         if action:
             action_function = getattr(self, action)
             action_function()
         else:
             Logger.info(f"No action defined for button ID: {index}")
 
-
     def set_button_color(self, button, color):
         Logger.trace("VehicleController.set_button_color")
-        
+
         self.pad.update_color(PadButton.get_button_id(button), color)
 
     def switch_device_state(self, device, button):
-        Logger.trace("VehicleController.switch_device_state")  
-        
+        Logger.trace("VehicleController.switch_device_state")
+
         state = getattr(self.ecu, device)
         new_state = ECUState.ENABLED if state == ECUState.DISABLED else ECUState.DISABLED
         Logger.debug(f"Switching device state {new_state}")
@@ -542,13 +545,13 @@ class VehicleController:
         self.set_button_color(button, color)
 
     def process_button_pressed_hazard(self):
-        Logger.trace("VehicleController.process_button_hazard")  
-        
+        Logger.trace("VehicleController.process_button_hazard")
+
         self.switch_device_state('hazard', 'HAZARD')
 
     def process_button_drive_change(self, new_state, active_button):
-        Logger.trace("VehicleController.process_button_drive_change")  
-        
+        Logger.trace("VehicleController.process_button_drive_change")
+
         current_state = self.ecu.drive_state
         if current_state == ECUState.PARK:
             self.parking_brake.disengage()
@@ -563,38 +566,38 @@ class VehicleController:
                 self.set_button_color(button, color)
 
     def process_button_pressed_park(self):
-        Logger.trace("VehicleController.process_button_pressed_park")  
-        
+        Logger.trace("VehicleController.process_button_pressed_park")
+
         self.process_button_drive_change(ECUState.PARK, 'PARK')
         # self.ecu.can_drive_state_command(ECUState.NEUTRAL)
         self.parking_brake.engage()
-        
+
     def process_button_pressed_reverse(self):
-        Logger.trace("VehicleController.process_button_pressed_reverse")  
-        
+        Logger.trace("VehicleController.process_button_pressed_reverse")
+
         self.process_button_drive_change(ECUState.REVERSE, 'REVERSE')
         self.ecu.can_drive_state_command(ECUState.REVERSE)
-        
+
     def process_button_pressed_neutral(self):
-        Logger.trace("VehicleController.process_button_pressed_neutral")  
-        
+        Logger.trace("VehicleController.process_button_pressed_neutral")
+
         self.process_button_drive_change(ECUState.NEUTRAL, 'NEUTRAL')
         self.ecu.can_drive_state_command(ECUState.NEUTRAL)
-         
+
     def process_button_pressed_drive(self):
-        Logger.trace("VehicleController.process_button_pressed_drive") 
-        
+        Logger.trace("VehicleController.process_button_pressed_drive")
+
         self.process_button_drive_change(ECUState.DRIVE, 'DRIVE')
         self.ecu.can_drive_state_command(ECUState.DRIVE)
 
     def process_button_pressed_exhaust_sound(self):
         Logger.trace("VehicleController.process_button_pressed_exhaust_sound")
-        
+
         self.switch_device_state('exhaust_sound', 'EXHAUST_SOUND')
 
     def process_button_pressed_f1(self):
         Logger.trace("VehicleController.process_button_pressed_f1")
-        
+
         # self.ecu.set_f1(ECUState.ENABLED)
         self.set_button_color('F1', 'cyan')
         # self.ecu.set_f2(ECUState.DISABLED)
@@ -602,7 +605,7 @@ class VehicleController:
 
     def process_button_pressed_f2(self):
         Logger.trace("VehicleController.process_button_pressed_f2")
-        
+
         # self.ecu.set_f2(ECUState.ENABLED)
         self.set_button_color('F2', 'yellow')
         # self.ecu.set_f1(ECUState.DISABLED)
@@ -610,30 +613,30 @@ class VehicleController:
 
     def process_button_pressed_regen(self):
         Logger.trace("VehicleController.process_button_pressed_regen")
-        
+
         # self.switch_device_state('regen_state', 'REGEN')
         pass
 
     def process_button_pressed_autopilot_on(self):
         Logger.trace("VehicleController.process_button_pressed_autopilot_on")
-        
+
         pass
 
     def process_button_pressed_autopilot_speed_up(self):
         Logger.trace("VehicleController.process_button_pressed_autopilot_speed_up")
-        
+
         pass
 
     def process_button_pressed_autopilot_speed_down(self):
         Logger.trace("VehicleController.process_button_pressed_autopilot_speed_down")
-        
+
         pass
-       
-           
+
+
 class Application:
     EXPECTED_BAUD_RATE = 500_000
-   
-    def __init__(self, can = None, listener = None):
+
+    def __init__(self, can=None, listener=None):
         self.first_run = True
         self.pad = Pad()
         self.ecu = ECU()
@@ -644,16 +647,16 @@ class Application:
         self.current_bus_state = None
         self.previous_bus_state = None
         self.can_message_queue = CanMessageQueue.get_instance()
-        
+
     def setup_can_connection(self, baudrate):
-        Logger.trace("Applcation.setup_can_connection")
-        
+        Logger.trace("Application.setup_can_connection")
+
         self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=baudrate, auto_restart=True)
         self.listener = self.can.listen(matches=[canio.Match(Pad.HEARTBEAT_ID), canio.Match(Pad.BUTTON_EVENT_ID)], timeout=.1)
-        
+
     def ensure_pad_operational(self):
-        Logger.trace("Applcation.ensure_pad_operational")
-      
+        Logger.trace("Application.ensure_pad_operational")
+
         if self.pad.state == PadState.UNKNOWN and self.first_run:
             self.ensure_pad_init_drive_state()
             self.first_run = False
@@ -663,48 +666,48 @@ class Application:
             pass
         else:
             Logger.info(f"unknown state: [{self.pad.state}]")
-            
+
     def ensure_pad_init_drive_state(self):
-        Logger.trace("Applcation.ensure_pad_init_drive_state")
-        
+        Logger.trace("Application.ensure_pad_init_drive_state")
+
         self.send_pad_activate()
         self.pad.to_operational()
         self.controller.init_drive_state()
-            
-    def send_pad_activate(self): 
-        Logger.trace("Applcation.send_pad_activate")
-        
+
+    def send_pad_activate(self):
+        Logger.trace("Application.send_pad_activate")
+
         id, data = self.pad.can_activate_keypad()
         self.can_message_queue.push_with_id(id, data)
-        
+
     def process_can_bus(self):
-        Logger.trace("Applcation.process_can_bus")
-        
+        Logger.trace("Application.process_can_bus")
+
         self.current_bus_state = self.can.state
-        
+
         if self.current_bus_state != self.previous_bus_state:
             Logger.info(f"CAN bus state: {self.current_bus_state}")
             self.previous_bus_state = self.current_bus_state
 
     def process_can_message(self):
-        Logger.trace("Applcation.process_can_message")
-        
-        message = self.listener.receive()    
-        
-        if message is not None:                         
-            self._process_message_based_on_id(message) 
-            
+        Logger.trace("Application.process_can_message")
+
+        message = self.listener.receive()
+
+        if message is not None:
+            self._process_message_based_on_id(message)
+
     def process_can_message_queue(self):
-        Logger.trace("Applcation.process_can_message_queue")
-        
+        Logger.trace("Application.process_can_message_queue")
+
         message = self.can_message_queue.pop()
         if message:
             Logger.debug(f"Sending CAN message id: {message.id} data: {message.data}")
             self.can.send(message)
 
     def _process_message_based_on_id(self, message):
-        Logger.trace("Applcation._process_message_based_on_id")
-        
+        Logger.trace("Application._process_message_based_on_id")
+
         process_methods = {
             Pad.HEARTBEAT_ID: self._process_pad_heartbeat,
             Pad.BUTTON_EVENT_ID: self._process_pad_button,
@@ -713,13 +716,13 @@ class Application:
         method(message)
 
     def _unknown_message(self, message):
-        Logger.trace("Applcation._unknown_message")
-        
+        Logger.trace("Application._unknown_message")
+
         Logger.info(f"unknown message: [{message.id}] {message.data}")
-        
+
     def _process_pad_heartbeat(self, message):
-        Logger.trace("Applcation._process_pad_heartbeat") 
-        
+        Logger.trace("Application._process_pad_heartbeat")
+
         if self.pad.can_is_heartbeat_boot_up(message.data):
             self.pad.to_boot_up()
         elif self.pad.can_is_heartbeat_pre_operational(message.data):
@@ -730,22 +733,22 @@ class Application:
             Logger.info(f"unknown heartbeat: [{message.id}] {message.data}")
 
     def _process_pad_button(self, message):
-        Logger.trace("Applcation._process_pad_button")
-        
+        Logger.trace("Application._process_pad_button")
+
         button_names = PadButton.get_button_names()
         pressed_buttons = Pad.decode_button_press(message.data)
-        
+
         for btn_name in button_names:
             button_id = PadButton.get_button_id(btn_name)
             if pressed_buttons[button_id]:
                 Logger.debug(f'PRESSED_{btn_name} / {button_id}')
                 self.controller.process_button_pressed(button_id)
-      
+
 
 ####################
 ### Main Program ###
 ####################
-Logger.current_level = Logger.DEBUG
+Logger.current_level = Logger.INFO
 Logger.info("INIT: Starting Feather M4")
 
 # If the CAN transceiver has a standby pin, bring it out of standby mode
@@ -765,11 +768,11 @@ application = Application()
 
 while True:
     Logger.trace(f"MAIN: tick | refresh: {FeatherSettings.CAN_REFRESH_RATE}")
-    
+
     application.process_can_bus()
     application.process_can_message()
     application.ensure_pad_operational()
     application.process_can_message_queue()
-   
+
     Logger.trace(f"MAIN: END tick -------------------------")
     time.sleep(FeatherSettings.CAN_REFRESH_RATE)
