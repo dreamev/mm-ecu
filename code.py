@@ -17,7 +17,6 @@
 # connect to serial: screen /dev/ttys000 115200
 # ref: https://learn.adafruit.com/adafruit-feather-m4-express-atsamd51/advanced-serial-console-on-mac-and-linux
 
-import struct
 import time
 import board
 import canio
@@ -355,20 +354,22 @@ class Pad:
     def get_button_index_from_id(self, id):
         Logger.trace("Pad.get_button_index_from_id")
 
-        for index, button in enumerate(self.buttons):
-            if button.id == id:
-                return index
-        return None  # Return None if the button ID is not found
+        return next(
+            (
+                index
+                for index, button in enumerate(self.buttons)
+                if button.id == id
+            ),
+            None,
+        )
 
     def to_boot_up(self):
         Logger.trace("Pad.to_boot_up")
 
-        if self.state == PadState.UNKNOWN or self.state == PadState.OPERATIONAL:
+        if self.state in [PadState.UNKNOWN, PadState.OPERATIONAL]:
             self.state = PadState.BOOT_UP
             Logger.info("Pad is now in Boot up.")
-        elif self.state == PadState.BOOT_UP:
-            pass
-        else:
+        elif self.state != PadState.BOOT_UP:
             Logger.info(f"Transition to Boot-up is not allowed from {self.state}")
 
     def to_operational(self):
@@ -377,9 +378,7 @@ class Pad:
         if self.state == PadState.BOOT_UP:
             self.state = PadState.OPERATIONAL
             Logger.info("Pad is transitioning to Operational.")
-        elif self.state == PadState.OPERATIONAL:
-            pass
-        else:
+        elif self.state != PadState.OPERATIONAL:
             Logger.info(f"Transition to Operational is not allowed from {self.state}")
 
     def reset(self):
@@ -391,19 +390,19 @@ class Pad:
     def can_activate_keypad(self):
         Logger.trace("Pad.can_activate_keypad")
 
-        id = 0x0
+        message_id = 0x0
         data = [0x01]
 
-        return id, data
+        return message_id, data
 
     def can_refresh_button_colors(self):
         Logger.trace("Pad.can_refresh_button_colors")
 
-        id = 0x215
+        message_id = 0x215
         pad_matrix = self.rgb_matrices()
         payload = self.rgb_matrix_to_hex(pad_matrix)
 
-        return id, payload
+        return message_id, payload
 
     def can_is_heartbeat_boot_up(self, data):
         heartbeat_bootup_data = bytes([0x00])
@@ -423,8 +422,8 @@ class Pad:
         Logger.info(f"updating color for button ID {button_id} to color {color}")
         button_index = self.get_button_index_from_id(button_id)
         self.buttons[button_index].change_color(color)
-        id, data = self.can_refresh_button_colors()
-        self.can_message_queue.push_with_id(id, data)
+        message_id, data = self.can_refresh_button_colors()
+        self.can_message_queue.push_with_id(message_id, data)
 
     def rgb_matrices(self):
         i = 0
@@ -434,7 +433,7 @@ class Pad:
             [0] * 12,
         ]
 
-        for button in self.buttons[0:12]:
+        for button in self.buttons[:12]:
             pad_rgb_matrix[0][i] = button.red
             pad_rgb_matrix[1][i] = button.green
             pad_rgb_matrix[2][i] = button.blue
@@ -479,8 +478,7 @@ class Pad:
         b1 = int_values[1]
         bay1 = [int(d) for d in bin((1 << 8) + b0)[-8:]]
         bay2 = [int(d) for d in bin((1 << 8) + b1)[-4:]]
-        button_array = bay2 + bay1
-        return button_array
+        return bay2 + bay1
 
     def __str__(self):
         return f"Pad(state={self.state})"
@@ -522,9 +520,7 @@ class VehicleController:
             for button, button_id in PadButton.BUTTONS.items()
         }
 
-        action = button_id_to_action.get(index)
-
-        if action:
+        if action := button_id_to_action.get(index):
             action_function = getattr(self, action)
             action_function()
         else:
@@ -614,23 +610,14 @@ class VehicleController:
     def process_button_pressed_regen(self):
         Logger.trace("VehicleController.process_button_pressed_regen")
 
-        # self.switch_device_state('regen_state', 'REGEN')
-        pass
-
     def process_button_pressed_autopilot_on(self):
         Logger.trace("VehicleController.process_button_pressed_autopilot_on")
-
-        pass
 
     def process_button_pressed_autopilot_speed_up(self):
         Logger.trace("VehicleController.process_button_pressed_autopilot_speed_up")
 
-        pass
-
     def process_button_pressed_autopilot_speed_down(self):
         Logger.trace("VehicleController.process_button_pressed_autopilot_speed_down")
-
-        pass
 
 
 class Application:
@@ -662,9 +649,7 @@ class Application:
             self.first_run = False
         elif self.pad.state == PadState.BOOT_UP:
             self.ensure_pad_init_drive_state()
-        elif self.pad.state == PadState.OPERATIONAL or self.pad.state == PadState.UNKNOWN:
-            pass
-        else:
+        elif self.pad.state not in [PadState.OPERATIONAL, PadState.UNKNOWN]:
             Logger.info(f"unknown state: [{self.pad.state}]")
 
     def ensure_pad_init_drive_state(self):
@@ -698,6 +683,8 @@ class Application:
             self._process_message_based_on_id(message)
 
     def process_can_message_queue(self):
+        """AI is creating summary for process_can_message_queue
+        """
         Logger.trace("Application.process_can_message_queue")
 
         message = self.can_message_queue.pop()
@@ -726,7 +713,7 @@ class Application:
         if self.pad.can_is_heartbeat_boot_up(message.data):
             self.pad.to_boot_up()
         elif self.pad.can_is_heartbeat_pre_operational(message.data):
-            self.pad.to_pre_operational()
+            pass
         elif self.pad.can_is_heartbeat_operational(message.data):
             self.pad.to_operational()
         else:
@@ -736,7 +723,7 @@ class Application:
         Logger.trace("Application._process_pad_button")
 
         button_names = PadButton.get_button_names()
-        pressed_buttons = Pad.decode_button_press(message.data)
+        pressed_buttons = self.pad.decode_button_press(message.data)
 
         for btn_name in button_names:
             button_id = PadButton.get_button_id(btn_name)
@@ -774,5 +761,5 @@ while True:
     application.ensure_pad_operational()
     application.process_can_message_queue()
 
-    Logger.trace(f"MAIN: END tick -------------------------")
+    Logger.trace("MAIN: END tick -------------------------")
     time.sleep(FeatherSettings.CAN_REFRESH_RATE)
