@@ -634,6 +634,7 @@ class Application:
     EXPECTED_BAUD_RATE = 500_000
    
     def __init__(self, can = None, listener = None):
+        self.first_run = True
         self.pad = Pad()
         self.ecu = ECU()
         self.parking_brake = ParkingBrake(board.D6, board.D9, board.D13, board.D11)
@@ -652,17 +653,23 @@ class Application:
         
     def ensure_pad_operational(self):
         Logger.trace("Applcation.ensure_pad_operational")
-       
-        if self.pad.state == PadState.UNKNOWN:
-            pass 
-        if self.pad.state == PadState.BOOT_UP:
-            self.send_pad_activate()
-            self.pad.to_operational()
-            self.controller.init_drive_state()
-        elif self.pad.state == PadState.OPERATIONAL:
+      
+        if self.pad.state == PadState.UNKNOWN and self.first_run:
+            self.ensure_pad_init_drive_state()
+            self.first_run = False
+        elif self.pad.state == PadState.BOOT_UP:
+            self.ensure_pad_init_drive_state()
+        elif self.pad.state == PadState.OPERATIONAL or self.pad.state == PadState.UNKNOWN:
             pass
         else:
             Logger.info(f"unknown state: [{self.pad.state}]")
+            
+    def ensure_pad_init_drive_state(self):
+        Logger.trace("Applcation.ensure_pad_init_drive_state")
+        
+        self.send_pad_activate()
+        self.pad.to_operational()
+        self.controller.init_drive_state()
             
     def send_pad_activate(self): 
         Logger.trace("Applcation.send_pad_activate")
