@@ -1,21 +1,6 @@
-# HEYOO!  Links
-#
-# Adafruit Feather
-# https://www.adafruit.com/product/4759
-#
-# Circut py
-# https://circuitpython.readthedocs.io/projects/bundle/en/latest/drivers.html
-#
-# Blink Marine 12 Button Keypad
-#   datasheet
-#   https://ss-usa.s3.amazonaws.com/c/308474458/media/1417060ec085e997cc28740285766947/PKP-2600-SI%20Datasheet.pdf
-#   Can Manual
-#   https://ss-usa.s3.amazonaws.com/c/308474458/media/30755e6bc22cc0b7e94093360556784/PKP-2600-SI_CANOpen_UM_REV1.1.pdf
-
-# HEYOO!  Commands!
-#
-# connect to serial: screen /dev/ttys000 115200
-# ref: https://learn.adafruit.com/adafruit-feather-m4-express-atsamd51/advanced-serial-console-on-mac-and-linux
+"""
+CAN Feather Controller for Marine CAN PAD interfaced with Tesla drive controller
+"""
 
 import time
 import board
@@ -24,10 +9,55 @@ import digitalio
 
 
 class FeatherSettings:
+    """
+    Represents the settings for the Feather.
+
+    This class provides configuration options for the Feather, such as the CAN refresh rate.
+
+    Attributes:
+        CAN_REFRESH_RATE: The refresh rate for the CAN communication.
+    """
+
     CAN_REFRESH_RATE = 0.5
 
 
 class Logger:
+    """
+    Provides logging functionality with different log levels.
+
+    Attributes:
+        EMERGENCY: The log level for emergency messages.
+        ALERT: The log level for alert messages.
+        CRITICAL: The log level for critical messages.
+        ERROR: The log level for error messages.
+        WARNING: The log level for warning messages.
+        NOTICE: The log level for notice messages.
+        INFO: The log level for informational messages.
+        DEBUG: The log level for debug messages.
+        TRACE: The log level for trace messages.
+
+    Methods:
+        log(level, message): Logs a message with the specified log level.
+        emergency(message): Logs an emergency message.
+        alert(message): Logs an alert message.
+        critical(message): Logs a critical message.
+        error(message): Logs an error message.
+        warning(message): Logs a warning message.
+        notice(message): Logs a notice message.
+        info(message): Logs an informational message.
+        debug(message): Logs a debug message.
+        trace(message): Logs a trace message.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+
     EMERGENCY = 0
     ALERT = 1
     CRITICAL = 2
@@ -38,7 +68,7 @@ class Logger:
     DEBUG = 7
     TRACE = 8
 
-    current_level = DEBUG
+    current_level = INFO
 
     @classmethod
     def log(cls, level, message):
@@ -83,9 +113,27 @@ class Logger:
 
 
 class CanMessage:
+    """
+    Represents a CAN message.
 
-    def __init__(self, id, data):
-        self.id = id
+    Args:
+        id: The identifier of the CAN message.
+        data: The data payload of the CAN message. Should be a list of length 8 or less.
+
+    Returns:
+        None
+
+    Raises:
+        None
+
+    Examples:
+        # Create a CAN message with id 1 and data [0x01, 0x02, 0x03]
+        message = CanMessage(1, [0x01, 0x02, 0x03])
+    """
+
+
+    def __init__(self, message_id, data):
+        self.message_id = message_id
         # Ensure that data is a list of length 8, padded with 0x00 if necessary
         if isinstance(data, list):
             if len(data) > 8:
@@ -99,16 +147,55 @@ class CanMessage:
             self.data = bytes([0x00] * 8)
 
     def message(self):
-        Logger.trace(f"CanMessage.message")
+        """
+        Returns a CAN message with the specified identifier and data payload.
 
-        return canio.Message(id=self.id, data=self.data)
+        Args:
+            self: The instance of the CanMessage class.
+
+        Returns:
+            A canio.Message object representing the CAN message.
+
+        Raises:
+            None
+        """
+
+        Logger.trace("CanMessage.message")
+
+        return canio.Message(id=self.message_id, data=self.data)
 
 
 class CanMessageQueue:
+    """
+    Represents a queue for storing CAN messages.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+
     _instance = None
 
     @classmethod
     def get_instance(cls):
+        """
+        Returns the instance of the CanMessageQueue class.
+
+        Args:
+            cls: The class object.
+
+        Returns:
+            The instance of the CanMessageQueue class.
+
+        Raises:
+            None
+        """
+
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -116,24 +203,73 @@ class CanMessageQueue:
     def __init__(self):
         self.queue = []
 
-    def push_with_id(self, id, data):
+    def push_with_id(self, message_id, data):
+        """
+        Pushes a CAN message to the queue with the specified message ID and data.
+
+        Args:
+            self: The instance of the CanMessageQueue class.
+            message_id: The identifier of the CAN message.
+            data: The data payload of the CAN message.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         Logger.trace("CanMessageQueue.push_with_id")
-        self.push(CanMessage(id, data).message())
+        self.push(CanMessage(message_id, data).message())
 
     def push(self, message):
+        """
+        Pushes a CAN message to the queue.
+
+        Args:
+            self: The instance of the CanMessageQueue class.
+            message: The CAN message to be pushed to the queue.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         Logger.trace("CanMessageQueue.push")
         self.queue.append(message)
 
     def pop(self):
         Logger.trace("CanMessageQueue.pop")
-        if self.queue:
-            queue_message = self.queue.pop(0)
-
-            return queue_message
-        return None
+        return self.queue.pop(0) if self.queue else None
 
 
 class PadButton:
+    """
+    Represents a pad button with the ability to change its color.
+
+    Attributes:
+        COLORS: A dictionary mapping color names to RGB values.
+        BUTTONS: A dictionary mapping button names to button IDs.
+
+    Methods:
+        __init__(button_id): Initializes the PadButton instance with the specified ID.
+        get_button_id(button): Returns the button ID for the specified button name.
+        get_pressed_button_id(button): Returns the button ID for the specified button name if it exists, otherwise returns None.
+        get_button_names(): Returns a list of button names.
+        change_color(color): Changes the color of the PadButton.
+
+    Args:
+        button_id: The ID of the PadButton instance.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+
     COLORS = {
         "red": (1, 0, 0),
         "blue": (0, 0, 1),
@@ -173,17 +309,30 @@ class PadButton:
     def get_button_names(cls):
         return list(cls.BUTTONS.keys())
 
-    def __init__(self, id):
-        self.id = id
+    def __init__(self, button_id):
+
+        self.button_id = button_id
         self.red = self.green = self.blue = 0
 
     def change_color(self, color):
+        """
+        Changes the color of the PadButton to the specified color.
+
+        Args:
+            self: The instance of the PadButton class.
+            color: The color to change the PadButton to.
+
+        Returns:
+            The updated instance of the PadButton.
+
+        Raises:
+            None
+        """
+
         Logger.trace("PadButton.change_color")
 
-        color_values = self.COLORS.get(color)
-
-        if color_values:
-            Logger.debug(f"Changing id {self.id} to color {color} with color_values {color_values}")
+        if color_values := self.COLORS.get(color):
+            Logger.debug(f"Changing button_id {self.button_id} to color {color} with color_values {color_values}")
             self.red, self.green, self.blue = color_values
         else:
             Logger.info("Invalid color")
@@ -192,6 +341,29 @@ class PadButton:
 
 
 class ECUState:
+    """
+    Represents the possible states of the ECU.
+
+    Attributes:
+        ENABLED: The enabled state of the ECU.
+        DISABLED: The disabled state of the ECU.
+        PARK: The park state of the ECU.
+        REVERSE: The reverse state of the ECU.
+        NEUTRAL: The neutral state of the ECU.
+        DRIVE: The drive state of the ECU.
+        HIGH_POWER: The high power state of the ECU.
+        LOW_POWER: The low power state of the ECU.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+
     ENABLED = True
     DISABLED = False
     PARK = 0
@@ -203,6 +375,37 @@ class ECUState:
 
 
 class ECU:
+    """
+    Represents the Electronic Control Unit (ECU) of a vehicle.
+
+    Attributes:
+        DRIVE_SHIFT_ID: The identifier for the drive shift command.
+
+    Methods:
+        __init__(): Initializes an instance of the ECU class.
+        set_hazard_lights(state): Sets the state of the hazard lights.
+        set_exhaust_sound(state): Sets the state of the exhaust sound.
+        set_f1(state): Sets the state of the F1 button.
+        set_f2(state): Sets the state of the F2 button.
+        set_drive_state(state): Sets the drive state of the ECU.
+        set_power_state(state): Sets the power state of the ECU.
+        set_regen_state(state): Sets the regen state of the ECU.
+        set_cruise_state(state): Sets the cruise state of the ECU.
+        modify_cruise_speed(modifier): Modifies the target cruise speed.
+        get_current_speed(): Retrieves the current speed.
+        can_drive_state_command(state): Sends a drive state command over CAN bus.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+
+
     DRIVE_SHIFT_ID = 0x697
 
     def __init__(self):
@@ -218,40 +421,193 @@ class ECU:
         self.can_message_queue = CanMessageQueue.get_instance()
 
     def set_hazard_lights(self, state):
+        """
+        Sets the state of the hazard lights.
+
+        Args:
+            self: The instance of the ECU class.
+            state: The state to set for the hazard lights.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         self.hazard = state
 
     def set_exhaust_sound(self, state):
+        """
+        Sets the state of the exhaust sound.
+
+        Args:
+            self: The instance of the ECU class.
+            state: The state to set for the exhaust sound.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         self.exhaust_sound = state
 
     def set_f1(self, state):
+        """
+        Sets the state of the F1 button.
+
+        Args:
+            self: The instance of the ECU class.
+            state: The state to set for the F1 button.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         self.f1 = state
 
     def set_f2(self, state):
+        """
+        Sets the state of the F2 button.
+
+        Args:
+            self: The instance of the ECU class.
+            state: The state to set for the F2 button.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         self.f2 = state
 
     def set_drive_state(self, state):
+        """
+        Sets the drive state of the ECU.
+
+        Args:
+            self: The instance of the ECU class.
+            state: The state to set for the drive state.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         self.drive_state = state
 
     def set_power_state(self, state):
+        """
+        Sets the power state of the ECU.
+
+        Args:
+            self: The instance of the ECU class.
+            state: The state to set for the power state.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         self.power_state = state
 
     def set_regen_state(self, state):
+        """
+        Sets the regen state of the ECU.
+
+        Args:
+            self: The instance of the ECU class.
+            state: The state to set for the regen state.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         self.regen_state = state
 
     def set_cruise_state(self, state):
+        """
+        Sets the cruise state of the ECU.
+
+        Args:
+            self: The instance of the ECU class.
+            state: The state to set for the cruise state.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         self.cruise_state = state
         if state == ECUState.ENABLED:
             self.target_cruise_speed = self.get_current_speed()
 
     def modify_cruise_speed(self, modifier):
+        """
+        Modifies the target cruise speed of the ECU.
+
+        Args:
+            self: The instance of the ECU class.
+            modifier: The value to modify the target cruise speed by.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         self.target_cruise_speed += modifier
 
     def get_current_speed(self):
+        """
+        Retrieves the current speed from the ECU.
+
+        Args:
+            self: The instance of the ECU class.
+
+        Returns:
+            The current speed.
+
+        Raises:
+            None
+        """
+
         Logger.trace("ECU.get_current_speed")
 
         return 0
 
     def can_drive_state_command(self, state):
+        """
+        Sends a drive state command over the CAN bus.
+
+        Args:
+            self: The instance of the ECU class.
+            state: The drive state command to send.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         Logger.trace("ECU.can_drive_state_command")
 
         can_data = {
@@ -260,17 +616,41 @@ class ECU:
             ECUState.REVERSE: [0x0f, 0xbe, 0xef],
         }
 
-        data = can_data.get(state, None)  # Set default value to None
+        data = can_data.get(state)  # Set default value to None
         if data is not None:
             Logger.debug(f"Sending drive state command {state} with data {data}")
             # Send the command 4 times to ensure it is received
             for _ in range(4):
                 self.can_message_queue.push_with_id(ECU.DRIVE_SHIFT_ID, data)
         else:
-            Logger.info(f"No data for drivestate command {state}")
+            Logger.info(f"No data for drive state command {state}")
 
 
 class ParkingBrake:
+    """
+    Represents a parking brake.
+
+    Methods:
+        __init__(engaged_pin, disengaged_pin, engage_pin, disengage_pin): Initializes an instance of the ParkingBrake class.
+        init_current_state(): Initializes the current state of the parking brake.
+        is_engaged(): Checks if the parking brake is engaged.
+        engage(): Engages the parking brake.
+        disengage(): Disengages the parking brake.
+        toggle(): Toggles the state of the parking brake.
+
+    Args:
+        engaged_pin: The pin for the engaged state sensor.
+        disengaged_pin: The pin for the disengaged state sensor.
+        engage_pin: The pin to engage the parking brake.
+        disengage_pin: The pin to disengage the parking brake.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+
 
     def __init__(self, engaged_pin, disengaged_pin, engage_pin, disengage_pin):
         self.sensor_engaged_pin = digitalio.DigitalInOut(engaged_pin)
@@ -291,6 +671,19 @@ class ParkingBrake:
         self.init_current_state()
 
     def init_current_state(self):
+        """
+        Initializes the current state of the parking brake.
+
+        Args:
+            self: The instance of the ParkingBrake class.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         Logger.trace("ParkingBrake.init_current_state")
 
         if self.sensor_engaged_pin.value:
@@ -305,11 +698,37 @@ class ParkingBrake:
             Logger.error("shit's weird, bro")
 
     def is_engaged(self):
+        """
+        Checks if the parking brake is engaged.
+
+        Args:
+            self: The instance of the ParkingBrake class.
+
+        Returns:
+            The state of the parking brake (engaged or disengaged).
+
+        Raises:
+            None
+        """
+
         Logger.trace("ParkingBrake.is_engaged")
 
         return self.engaged
 
     def engage(self):
+        """
+        Engages the parking brake.
+
+        Args:
+            self: The instance of the ParkingBrake class.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         Logger.trace("ParkingBrake.engage")
 
         if not self.engaged:
@@ -318,6 +737,19 @@ class ParkingBrake:
             self.engaged = ECUState.ENABLED
 
     def disengage(self):
+        """
+        Disengages the parking brake.
+
+        Args:
+            self: The instance of the ParkingBrake class.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         Logger.trace("ParkingBrake.disengage")
 
         if self.engaged:
@@ -326,6 +758,19 @@ class ParkingBrake:
             self.engaged = ECUState.DISABLED
 
     def toggle(self):
+        """
+        Toggles the state of the parking brake.
+
+        Args:
+            self: The instance of the ParkingBrake class.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         Logger.trace("ParkingBrake.toggle")
 
         if self.engaged:
@@ -335,6 +780,25 @@ class ParkingBrake:
 
 
 class PadState:
+    """
+    Represents the possible states of a pad.
+
+    Attributes:
+        UNKNOWN: The unknown state of the pad.
+        BOOT_UP: The boot-up state of the pad.
+        PRE_OPERATIONAL: The pre-operational state of the pad.
+        OPERATIONAL: The operational state of the pad.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+
     UNKNOWN = "Unknown"
     BOOT_UP = "Boot-up"
     PRE_OPERATIONAL = "Pre-operational"
@@ -342,28 +806,64 @@ class PadState:
 
 
 class Pad:
+    """
+    Represents a pad.
+
+    This class provides functionality to interact with the pad, such as transitioning its state, updating button colors, and decoding button press states.
+
+    Attributes:
+        HEARTBEAT_ID (int): The ID of the heartbeat message.
+        BUTTON_EVENT_ID (int): The ID of the button event message.
+        COLOR_REFRESH_ID (int): The ID of the color refresh message.
+    """
+
+
     HEARTBEAT_ID = 0x715
     BUTTON_EVENT_ID = 0x195
     COLOR_REFRESH_ID = 0x215
 
     def __init__(self):
         self.state = PadState.UNKNOWN
-        self.buttons = sorted([PadButton(id) for name, id in PadButton.BUTTONS.items()], key=lambda button:-button.id)
+        self.buttons = sorted([PadButton(button_id) for _name, button_id in PadButton.BUTTONS.items()], key=lambda button:-button.button_id)
         self.can_message_queue = CanMessageQueue.get_instance()
 
-    def get_button_index_from_id(self, id):
+    def get_button_index_from_id(self, button_id):
+        """
+        Returns the index of the button with the given ID.
+
+        Args:
+            button_id: The ID of the button to search for.
+
+        Returns:
+            int or None: The index of the button if found, None otherwise.
+        """
+
+
         Logger.trace("Pad.get_button_index_from_id")
 
         return next(
             (
                 index
                 for index, button in enumerate(self.buttons)
-                if button.id == id
+                if button.button_id == button_id
             ),
             None,
         )
 
     def to_boot_up(self):
+        """
+        Transitions the pad to the boot-up state.
+
+        If the current state of the pad is UNKNOWN or OPERATIONAL, it is transitioned to BOOT_UP and an informational message is logged.
+        If the current state is not BOOT_UP, an informational message is logged.
+
+        Args:
+            self: The Pad instance.
+
+        Returns:
+            None
+        """
+
         Logger.trace("Pad.to_boot_up")
 
         if self.state in [PadState.UNKNOWN, PadState.OPERATIONAL]:
@@ -373,6 +873,19 @@ class Pad:
             Logger.info(f"Transition to Boot-up is not allowed from {self.state}")
 
     def to_operational(self):
+        """
+        Transitions the pad to the operational state.
+
+        If the current state of the pad is BOOT_UP, it is transitioned to OPERATIONAL and an informational message is logged.
+        If the current state is not OPERATIONAL, an informational message is logged.
+
+        Args:
+            self: The Pad instance.
+
+        Returns:
+            None
+        """
+
         Logger.trace("Pad.to_operational")
 
         if self.state == PadState.BOOT_UP:
@@ -382,12 +895,36 @@ class Pad:
             Logger.info(f"Transition to Operational is not allowed from {self.state}")
 
     def reset(self):
+        """
+        Resets the pad to the unknown state.
+
+        This function sets the state of the pad to UNKNOWN and logs an informational message.
+
+        Args:
+            self: The Pad instance.
+
+        Returns:
+            None
+        """
+
         Logger.trace("Pad.reset")
 
         self.state = PadState.UNKNOWN
         Logger.info("Pad has been reset to Unknown state.")
 
     def can_activate_keypad(self):
+        """
+        Activates the keypad.
+
+        Returns:
+            Tuple[int, List[int]]: A tuple containing the message ID and the data.
+
+        Examples:
+            >>> pad = Pad()
+            >>> pad.can_activate_keypad()
+            (0, [1])
+        """
+
         Logger.trace("Pad.can_activate_keypad")
 
         message_id = 0x0
@@ -396,6 +933,18 @@ class Pad:
         return message_id, data
 
     def can_refresh_button_colors(self):
+        """
+        Refreshes the colors of the buttons on the pad.
+
+        Returns:
+            Tuple[int, str]: A tuple containing the message ID and the payload.
+
+        Examples:
+            >>> pad = Pad()
+            >>> pad.can_refresh_button_colors()
+            (533, '0x00FF00')
+        """
+
         Logger.trace("Pad.can_refresh_button_colors")
 
         message_id = 0x215
@@ -405,18 +954,66 @@ class Pad:
         return message_id, payload
 
     def can_is_heartbeat_boot_up(self, data):
+        """
+        Checks if the given data corresponds to the heartbeat boot-up data.
+
+        Args:
+            data (bytes): The data to be checked.
+
+        Returns:
+            bool: True if the data matches the heartbeat boot-up data, False otherwise.
+        """
+
         heartbeat_bootup_data = bytes([0x00])
         return heartbeat_bootup_data == data
 
     def can_is_heartbeat_pre_operational(self, data):
+        """
+        Checks if the given data corresponds to the heartbeat pre-operational data.
+
+        Args:
+            data (bytes): The data to be checked.
+
+        Returns:
+            bool: True if the data matches the heartbeat pre-operational data, False otherwise.
+        """
+
         heartbeat_pre_operational_data = bytes([0x7f])
         return heartbeat_pre_operational_data == data
 
     def can_is_heartbeat_operational(self, data):
+        """
+        Checks if the received data corresponds to an operational heartbeat.
+
+        Args:
+            data: The data received.
+
+        Returns:
+            True if the data corresponds to an operational heartbeat, False otherwise.
+
+        Raises:
+            None
+        """
+
         heartbeat_operational_data = bytes([0x05])
         return heartbeat_operational_data == data
 
     def update_color(self, button_id, color):
+        """
+        Updates the color of a button.
+
+        Args:
+            self: The instance of the Pad class.
+            button_id: The ID of the button to update the color for.
+            color: The color to set for the button.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+
         Logger.trace("Pad.update_color")
 
         Logger.info(f"updating color for button ID {button_id} to color {color}")
@@ -426,6 +1023,19 @@ class Pad:
         self.can_message_queue.push_with_id(message_id, data)
 
     def rgb_matrices(self):
+        """
+        Returns the RGB matrices of the pad.
+
+        Args:
+            self: The instance of the Pad class.
+
+        Returns:
+            The RGB matrices of the pad.
+
+        Raises:
+            None
+        """
+
         i = 0
         pad_rgb_matrix = [
             [0] * 12,
@@ -442,6 +1052,19 @@ class Pad:
         return pad_rgb_matrix
 
     def rgb_matrix_to_hex(self, matrix):
+        """
+        Converts an RGB matrix to a hexadecimal representation.
+
+        Args:
+            matrix: The RGB matrix to convert.
+
+        Returns:
+            The hexadecimal representation of the RGB matrix.
+
+        Raises:
+            None
+        """
+
         # Flipping ordering of output
         rr = matrix[0][::-1]
         gr = matrix[1][::-1]
@@ -473,7 +1096,20 @@ class Pad:
         return hex_matrix
 
     def decode_button_press(self, state):
-        int_values = [x for x in state]
+        """
+        Decodes the button press state.
+
+        Args:
+            state: The button press state to decode.
+
+        Returns:
+            The decoded button press state.
+
+        Raises:
+            None
+        """
+
+        int_values = list(state)
         b0 = int_values[0]
         b1 = int_values[1]
         bay1 = [int(d) for d in bin((1 << 8) + b0)[-8:]]
@@ -485,6 +1121,21 @@ class Pad:
 
 
 class VehicleController:
+    """
+    Processes the button press event for changing the drive state of the vehicle.
+
+    Args:
+        self: The instance of the VehicleController class.
+        new_state: The new drive state to set.
+        active_button: The button that triggered the event.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+
 
     def __init__(self, ecu, pad, parking_brake):
         self.ecu = ecu
@@ -623,7 +1274,7 @@ class VehicleController:
 class Application:
     EXPECTED_BAUD_RATE = 500_000
 
-    def __init__(self, can=None, listener=None):
+    def __init__(self):
         self.first_run = True
         self.pad = Pad()
         self.ecu = ECU()
@@ -662,8 +1313,8 @@ class Application:
     def send_pad_activate(self):
         Logger.trace("Application.send_pad_activate")
 
-        id, data = self.pad.can_activate_keypad()
-        self.can_message_queue.push_with_id(id, data)
+        message_id, data = self.pad.can_activate_keypad()
+        self.can_message_queue.push_with_id(message_id, data)
 
     def process_can_bus(self):
         Logger.trace("Application.process_can_bus")
@@ -687,8 +1338,7 @@ class Application:
         """
         Logger.trace("Application.process_can_message_queue")
 
-        message = self.can_message_queue.pop()
-        if message:
+        if message := self.can_message_queue.pop():
             Logger.debug(f"Sending CAN message id: {message.id} data: {message.data}")
             self.can.send(message)
 
@@ -735,7 +1385,7 @@ class Application:
 ####################
 ### Main Program ###
 ####################
-Logger.current_level = Logger.INFO
+# Logger.current_level = Logger.DEBUG
 Logger.info("INIT: Starting Feather M4")
 
 # If the CAN transceiver has a standby pin, bring it out of standby mode
