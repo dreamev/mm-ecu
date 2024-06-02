@@ -204,7 +204,7 @@ class ECUState:
 class ECU:
     DRIVE_SHIFT_ID = 0x697
 
-    def __init__(self):
+    def __init__(self, reverse_pin, neutral_pin, drive_pin):
         self.hazard = ECUState.ENABLED
         self.drive_state = ECUState.PARK
         self.exhaust_sound = ECUState.DISABLED
@@ -214,7 +214,21 @@ class ECU:
         self.target_cruise_speed = 0
         self.f1 = ECUState.DISABLED
         self.f2 = ECUState.DISABLED
-        self.can_message_queue = CanMessageQueue.get_instance()
+
+        self.reverse_pin = digitalio.DigitalInOut(reverse_pin)
+        self.reverse_pin.direction = digitalio.Direction.OUTPUT
+        self.reverse_pin.pull = digitalio.Pull.UP
+        self.reverse_pin.value = ECUState.DISABLED
+
+        self.neutral_pin = digitalio.DigitalInOut(neutral_pin)
+        self.neutral_pin.direction = digitalio.Direction.OUTPUT
+        self.neutral_pin.pull = digitalio.Pull.UP
+        self.neutral_pin.value = ECUState.DISABLED
+
+        self.drive_pin = digitalio.DigitalInOut(drive_pin)
+        self.drive_pin.direction = digitalio.Direction.OUTPUT
+        self.drive_pin.pull = digitalio.Pull.UP
+        self.drive_pin.value = ECUState.DISABLED
 
     def set_hazard_lights(self, state):
         self.hazard = state
@@ -249,6 +263,23 @@ class ECU:
         Logger.trace("ECU.get_current_speed")
 
         return 0
+
+    def drive_state_command(self, command):
+        Logger.trace("ECU.drive_state_command")
+
+        pin = {
+            ECUState.REVERSE: self.reverse_pin,
+            ECUState.NEUTRAL: self.neutral_pin,
+            ECUState.DRIVE: self.drive_pin,
+        }
+
+        if pin is not None:
+            Logger.debug(f"Setting drive state to {command}")
+            pin.value = ECUState.ENABLED
+            time.sleep(0.5)
+            pin.value = ECUState.DISABLED
+        else:
+            Logger.info(f"No pin for drivestate command {command}")
 
     def can_drive_state_command(self, state):
         Logger.trace("ECU.can_drive_state_command")
@@ -291,16 +322,17 @@ class ParkingBrake:
     def init_current_state(self):
         Logger.trace("ParkingBrake.init_current_state")
 
-        if self.sensor_engaged_pin.value:
-            Logger.info("ParkingBrake Engaged")
+        Logger.debug("--- ParkingBrake.init_current_state ---")
+        Logger.debug(f"Engaged Pin State: {self.sensor_engaged_pin.value}")
+        Logger.debug(f"Disengaged Pin State: {self.sensor_disengaged_pin.value}")
+        Logger.debug("---------------------------------------")
 
+        if self.sensor_engaged_pin.value:
             self.engage()
         elif self.sensor_disengaged_pin.value:
-            Logger.info("ParkingBrake Disengaged")
-
             self.disengage()
         else:
-            Logger.error("shit's weird, bro")
+            Logger.error("The parking brake sensor pins are not in a valid state.")
 
     def is_engaged(self):
         Logger.trace("ParkingBrake.is_engaged")
@@ -566,26 +598,25 @@ class VehicleController:
         Logger.trace("VehicleController.process_button_pressed_park")
 
         self.process_button_drive_change(ECUState.PARK, 'PARK')
-        # self.ecu.can_drive_state_command(ECUState.NEUTRAL)
         self.parking_brake.engage()
 
     def process_button_pressed_reverse(self):
         Logger.trace("VehicleController.process_button_pressed_reverse")
 
         self.process_button_drive_change(ECUState.REVERSE, 'REVERSE')
-        self.ecu.can_drive_state_command(ECUState.REVERSE)
+        self.ecu.drive_state_command(ECUState.REVERSE)
 
     def process_button_pressed_neutral(self):
         Logger.trace("VehicleController.process_button_pressed_neutral")
 
         self.process_button_drive_change(ECUState.NEUTRAL, 'NEUTRAL')
-        self.ecu.can_drive_state_command(ECUState.NEUTRAL)
+        self.ecu.drive_state_command(ECUState.NEUTRAL)
 
     def process_button_pressed_drive(self):
         Logger.trace("VehicleController.process_button_pressed_drive")
 
         self.process_button_drive_change(ECUState.DRIVE, 'DRIVE')
-        self.ecu.can_drive_state_command(ECUState.DRIVE)
+        self.ecu.drive_state_command(ECUState.DRIVE)
 
     def process_button_pressed_exhaust_sound(self):
         Logger.trace("VehicleController.process_button_pressed_exhaust_sound")
@@ -635,7 +666,7 @@ class Application:
 
     def __init__(self, can = None, listener = None):
         self.pad = Pad()
-        self.ecu = ECU()
+        self.ecu = ECU(board.D11, board.D12, board.D13)
         self.parking_brake = ParkingBrake(board.D9, board.D10, board.D5, board.D6)
         self.controller = VehicleController(self.ecu, self.pad, self.parking_brake)
         self.baud_rate = Application.EXPECTED_BAUD_RATE
