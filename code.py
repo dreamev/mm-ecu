@@ -264,12 +264,13 @@ class ECU:
     def drive_state_command(self, command):
         Logger.trace("ECU.drive_state_command")
 
-        pin = {
+        pin_data = {
             ECUState.REVERSE: self.reverse_pin,
             ECUState.NEUTRAL: self.neutral_pin,
             ECUState.DRIVE: self.drive_pin,
         }
 
+        pin = pin_data.get(command, None)
         if pin is not None:
             Logger.debug(f"Setting drive state to {command}")
             pin.value = ECUState.ENABLED
@@ -527,6 +528,7 @@ class VehicleController:
             "DRIVE": "black",
             "REVERSE": "black",
             "NEUTRAL": "blue",
+            "PARK": "blue" if self.parking_brake.is_engaged() else "black",
         }
 
         if self.parking_brake.is_engaged():
@@ -664,7 +666,7 @@ class Application:
     def __init__(self, can = None, listener = None):
         self.pad = Pad()
         self.ecu = ECU(board.D11, board.D12, board.D13)
-        self.parking_brake = ParkingBrake(board.D9, board.D10, board.D5, board.D6)
+        self.parking_brake = ParkingBrake(board.D10, board.D9, board.D6, board.D5)
         self.controller = VehicleController(self.ecu, self.pad, self.parking_brake)
         self.baud_rate = Application.EXPECTED_BAUD_RATE
         self.setup_can_connection(self.baud_rate)
