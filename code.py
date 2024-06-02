@@ -217,17 +217,14 @@ class ECU:
 
         self.reverse_pin = digitalio.DigitalInOut(reverse_pin)
         self.reverse_pin.direction = digitalio.Direction.OUTPUT
-        self.reverse_pin.pull = digitalio.Pull.UP
         self.reverse_pin.value = ECUState.DISABLED
 
         self.neutral_pin = digitalio.DigitalInOut(neutral_pin)
         self.neutral_pin.direction = digitalio.Direction.OUTPUT
-        self.neutral_pin.pull = digitalio.Pull.UP
         self.neutral_pin.value = ECUState.DISABLED
 
         self.drive_pin = digitalio.DigitalInOut(drive_pin)
         self.drive_pin.direction = digitalio.Direction.OUTPUT
-        self.drive_pin.pull = digitalio.Pull.UP
         self.drive_pin.value = ECUState.DISABLED
 
     def set_hazard_lights(self, state):
