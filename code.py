@@ -371,7 +371,7 @@ class Pad:
     def to_operational(self):
         Logger.trace("Pad.to_operational")
 
-        if self.state == PadState.BOOT_UP:
+        if self.state != PadState.OPERATIONAL:
             self.state = PadState.OPERATIONAL
             Logger.info("Pad is transitioning to Operational.")
         elif self.state == PadState.OPERATIONAL:
@@ -495,9 +495,9 @@ class VehicleController:
         Logger.debug("Initializing drive state")
 
         button_state = {
-            "DRIVE": "blue" if self.parking_brake.is_engaged() else "black",
+            "DRIVE": "black",
             "REVERSE": "black",
-            "NEUTRAL": "black"
+            "NEUTRAL": "blue",
         }
 
         if self.parking_brake.is_engaged():
@@ -636,13 +636,14 @@ class Application:
     def __init__(self, can = None, listener = None):
         self.pad = Pad()
         self.ecu = ECU()
-        self.parking_brake = ParkingBrake(board.D6, board.D9, board.D13, board.D11)
+        self.parking_brake = ParkingBrake(board.D9, board.D10, board.D5, board.D6)
         self.controller = VehicleController(self.ecu, self.pad, self.parking_brake)
         self.baud_rate = Application.EXPECTED_BAUD_RATE
         self.setup_can_connection(self.baud_rate)
         self.current_bus_state = None
         self.previous_bus_state = None
         self.can_message_queue = CanMessageQueue.get_instance()
+        self.first_boot = True
 
     def setup_can_connection(self, baudrate):
         Logger.trace("Applcation.setup_can_connection")
@@ -654,15 +655,18 @@ class Application:
         Logger.trace("Applcation.ensure_pad_operational")
 
         if self.pad.state == PadState.UNKNOWN:
-            pass
-        if self.pad.state == PadState.BOOT_UP:
+            if self.first_boot:
+                self.send_pad_activate()
+                self.pad.to_operational()
+                self.controller.init_drive_state()
+                self.first_boot = False
+        elif self.pad.state == PadState.BOOT_UP:
             self.send_pad_activate()
             self.pad.to_operational()
             self.controller.init_drive_state()
-        elif self.pad.state == PadState.OPERATIONAL:
-            pass
-        else:
+        elif self.pad.state != PadState.OPERATIONAL:
             Logger.info(f"unknown state: [{self.pad.state}]")
+
 
     def send_pad_activate(self):
         Logger.trace("Applcation.send_pad_activate")
