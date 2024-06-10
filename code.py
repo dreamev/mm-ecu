@@ -22,6 +22,7 @@ import time
 import board
 import canio
 import digitalio
+from adafruit_motor import servo
 
 class FeatherSettings:
     CAN_REFRESH_RATE = 0.5
@@ -369,6 +370,45 @@ class PadState:
     OPERATIONAL = "Operational"
 
 
+class TeslaECU:
+    # TODO: Test out actual MAX_BATTERY_VOLTAGE and MIN_BATTERY_VOLTAGE values
+    MAX_BATTERY_VOLTAGE = 400
+    MIN_BATTERY_VOLTAGE = 200
+    BATTERY_ID = 0x126
+
+    def decode_battery_state_to_voltage(self, message_data):
+        Logger.trace("TeslaECU.decode_battery_state")
+        Logger.debug(f"Battery Data: {message_data}")
+        # TODO: Do something here
+
+    def battery_percentage(self, voltage):
+        Logger.trace("TeslaECU.battery_percentage")
+
+        percentage = (voltage - self.MIN_BATTERY_VOLTAGE) / (self.MAX_BATTERY_VOLTAGE - self.MIN_BATTERY_VOLTAGE)
+        return percentage
+
+    def decode_battery_state_to_percentage(data):
+        Logger.trace("TeslaECU.decode_battery_state_to_percentage")
+        voltage = self.decode_battery_state_to_voltage(data)
+        return self.battery_percentage(voltage)
+
+
+class BatteryGauge:
+    # TODO: Test out actual MIN_ANGLE and MAX_ANGLE values
+    MIN_ANGLE = 30
+    MAX_ANGLE = 160
+
+    def __init__(self, gauge_pin):
+        self.servo = servo.Servo(gauge_pin)
+
+    def update_battery_gauge(self, percentage):
+        Logger.trace('BatteryGauge.update_battery_gauge')
+
+        angle = self.MAX_ANGLE - (percentage * (self.MAX_ANGLE - self.MIN_ANGLE))
+        Logger.debug(f"Updating battery gauge to angle {angle} based on battery percentage {percentage}")
+        self.servo.angle = angle
+
+
 class Pad:
     HEARTBEAT_ID = 0x715
     BUTTON_EVENT_ID = 0x195
@@ -581,7 +621,7 @@ class VehicleController:
         Logger.trace("VehicleController.process_button_drive_change")
 
         current_state = self.ecu.drive_state
-        if current_state == ECUState.PARK:
+        if new_state == ECUState.REVERSE or new_state == ECUState.DRIVE:
             self.parking_brake.disengage()
 
         if current_state != new_state:
@@ -667,6 +707,7 @@ class Application:
         self.pad = Pad()
         self.ecu = ECU(board.D11, board.D12, board.D13)
         self.parking_brake = ParkingBrake(board.D10, board.D9, board.D6, board.D5)
+        self.battery_gauge = BatteryGauge(board.A0)
         self.controller = VehicleController(self.ecu, self.pad, self.parking_brake)
         self.baud_rate = Application.EXPECTED_BAUD_RATE
         self.setup_can_connection(self.baud_rate)
@@ -679,7 +720,12 @@ class Application:
         Logger.trace("Applcation.setup_can_connection")
 
         self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=baudrate, auto_restart=True)
-        self.listener = self.can.listen(matches=[canio.Match(Pad.HEARTBEAT_ID), canio.Match(Pad.BUTTON_EVENT_ID)], timeout=.1)
+        self.listener = self.can.listen(matches=[canio.Match(TeslaECU.BATTERY_ID), canio.Match(Pad.BUTTON_EVENT_ID)], timeout=.1)
+
+        # Pretty sure I read that the Feather M4 can only handle two listeners.
+        # The heartbeat is sent on startup, but not in time to catch it so we adapt anyway.
+        # In the event we can keep this, I will. It's handy, but really only for debugging. The heartbeat isn't sent during normal operations
+        # self.listener = self.can.listen(matches=[canio.Match(TeslaECU.BATTERY_ID), canio.Match(Pad.HEARTBEAT_ID), canio.Match(Pad.BUTTON_EVENT_ID)], timeout=.1)
 
     def ensure_pad_operational(self):
         Logger.trace("Applcation.ensure_pad_operational")
@@ -735,6 +781,7 @@ class Application:
         process_methods = {
             Pad.HEARTBEAT_ID: self._process_pad_heartbeat,
             Pad.BUTTON_EVENT_ID: self._process_pad_button,
+            TeslaECU.BATTERY_ID: self._process_battery_state,
         }
         method = process_methods.get(message.id, self._unknown_message)
         method(message)
@@ -767,6 +814,12 @@ class Application:
             if pressed_buttons[button_id]:
                 Logger.debug(f'PRESSED_{btn_name} / {button_id}')
                 self.controller.process_button_pressed(button_id)
+
+    def _process_battery_state(self, message):
+        Logger.trace("Application._process_battery_state")
+
+        battery_percentage = TeslaECU.decode_battery_state_to_percentage(message.data)
+        BatteryGauge.update_battery_gauge(battery_percentage)
 
 
 ####################
