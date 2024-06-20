@@ -22,6 +22,7 @@ import time
 import board
 import canio
 import digitalio
+import pwmio
 from adafruit_motor import servo
 
 class FeatherSettings:
@@ -373,41 +374,59 @@ class PadState:
 class TeslaECU:
     # TODO: Test out actual MAX_BATTERY_VOLTAGE and MIN_BATTERY_VOLTAGE values
     MAX_BATTERY_VOLTAGE = 400
-    MIN_BATTERY_VOLTAGE = 200
+    MIN_BATTERY_VOLTAGE = 325
     BATTERY_ID = 0x126
 
-    def decode_battery_state_to_voltage(self, message_data):
+    # BO_ 294 DI_hvBusStatus: 3 VEH
+    #       SG_ DI_voltage : 0|10@1+ (0.5,0) [0|500] "V" X
+    #       SG_ DI_current : 10|11@1+ (1,0) [0|2047] "A" X
+    def decode_battery_state_to_voltage(self, can_payload):
         Logger.trace("TeslaECU.decode_battery_state")
-        Logger.debug(f"Battery Data: {message_data}")
-        # TODO: Do something here
+
+        voltage_raw = (can_payload[0] & 0b11111111) | ((can_payload[1] & 0b00000011) << 8)
+        voltage = voltage_raw * 0.5
+        Logger.debug(f"voltage: {voltage}")
+
+        return voltage
 
     def battery_percentage(self, voltage):
         Logger.trace("TeslaECU.battery_percentage")
 
         percentage = (voltage - self.MIN_BATTERY_VOLTAGE) / (self.MAX_BATTERY_VOLTAGE - self.MIN_BATTERY_VOLTAGE)
+        Logger.debug(f"battery percentage : {percentage}")
         return percentage
 
-    def decode_battery_state_to_percentage(data):
+    def decode_battery_state_to_percentage(self, data):
         Logger.trace("TeslaECU.decode_battery_state_to_percentage")
         voltage = self.decode_battery_state_to_voltage(data)
         return self.battery_percentage(voltage)
 
 
 class BatteryGauge:
-    # TODO: Test out actual MIN_ANGLE and MAX_ANGLE values
-    MIN_ANGLE = 30
-    MAX_ANGLE = 160
+    MIN_ANGLE = 57
+    MAX_ANGLE = 119
+    UPDATE_FREQUENCY = 100
 
     def __init__(self, gauge_pin):
-        self.servo = servo.Servo(gauge_pin)
+        self.pwm = pwmio.PWMOut(gauge_pin, duty_cycle=2 ** 15, frequency=50)
+        self.servo = servo.Servo(self.pwm, min_pulse=500, max_pulse=2500)
+        self.servo.angle = (self.MAX_ANGLE + self.MIN_ANGLE) / 2
+        self.update_counter = 0
+        self.first_boot = True
 
     def update_battery_gauge(self, percentage):
         Logger.trace('BatteryGauge.update_battery_gauge')
 
-        angle = self.MAX_ANGLE - (percentage * (self.MAX_ANGLE - self.MIN_ANGLE))
-        Logger.debug(f"Updating battery gauge to angle {angle} based on battery percentage {percentage}")
-        self.servo.angle = angle
-
+        self.update_counter = self.update_counter + 1
+        angle = self.MAX_ANGLE * percentage
+        if self.update_counter == self.UPDATE_FREQUENCY or self.first_boot:
+            Logger.debug(f"Updating battery gauge to percentage: {percentage} with angle: {angle}")
+            self.servo.angle = angle
+            self.update_counter = 0
+            self.first_boot = False
+        else:
+            Logger.debug(f"Skipping battery gauge update. Counter: {self.update_counter} of {self.UPDATE_FREQUENCY}, angle: {angle}")
+            pass
 
 class Pad:
     HEARTBEAT_ID = 0x715
@@ -705,9 +724,10 @@ class Application:
 
     def __init__(self, can = None, listener = None):
         self.pad = Pad()
+        self.tesla_ecu = TeslaECU()
         self.ecu = ECU(board.D11, board.D12, board.D13)
         self.parking_brake = ParkingBrake(board.D10, board.D9, board.D6, board.D5)
-        self.battery_gauge = BatteryGauge(board.A0)
+        self.battery_gauge = BatteryGauge(board.A1)
         self.controller = VehicleController(self.ecu, self.pad, self.parking_brake)
         self.baud_rate = Application.EXPECTED_BAUD_RATE
         self.setup_can_connection(self.baud_rate)
@@ -715,17 +735,14 @@ class Application:
         self.previous_bus_state = None
         self.can_message_queue = CanMessageQueue.get_instance()
         self.first_boot = True
+        self.loop_count = 0
 
     def setup_can_connection(self, baudrate):
         Logger.trace("Applcation.setup_can_connection")
 
         self.can = canio.CAN(rx=board.CAN_RX, tx=board.CAN_TX, baudrate=baudrate, auto_restart=True)
-        self.listener = self.can.listen(matches=[canio.Match(TeslaECU.BATTERY_ID), canio.Match(Pad.BUTTON_EVENT_ID)], timeout=.1)
-
-        # Pretty sure I read that the Feather M4 can only handle two listeners.
-        # The heartbeat is sent on startup, but not in time to catch it so we adapt anyway.
-        # In the event we can keep this, I will. It's handy, but really only for debugging. The heartbeat isn't sent during normal operations
-        # self.listener = self.can.listen(matches=[canio.Match(TeslaECU.BATTERY_ID), canio.Match(Pad.HEARTBEAT_ID), canio.Match(Pad.BUTTON_EVENT_ID)], timeout=.1)
+        self.listener = self.can.listen(matches=[canio.Match(TeslaECU.BATTERY_ID), canio.Match(Pad.HEARTBEAT_ID), canio.Match(Pad.BUTTON_EVENT_ID)], timeout=.1)
+        # self.listener = self.can.listen(matches=[canio.Match(Pad.HEARTBEAT_ID), canio.Match(Pad.BUTTON_EVENT_ID)], timeout=.1)
 
     def ensure_pad_operational(self):
         Logger.trace("Applcation.ensure_pad_operational")
@@ -818,14 +835,14 @@ class Application:
     def _process_battery_state(self, message):
         Logger.trace("Application._process_battery_state")
 
-        battery_percentage = TeslaECU.decode_battery_state_to_percentage(message.data)
-        BatteryGauge.update_battery_gauge(battery_percentage)
+        battery_percentage = self.tesla_ecu.decode_battery_state_to_percentage(message.data)
+        self.battery_gauge.update_battery_gauge(battery_percentage)
 
 
 ####################
 ### Main Program ###
 ####################
-Logger.current_level = Logger.DEBUG
+Logger.current_level = Logger.WARNING
 Logger.info("INIT: Starting Feather M4")
 
 # If the CAN transceiver has a standby pin, bring it out of standby mode
@@ -852,4 +869,4 @@ while True:
     application.process_can_message_queue()
 
     Logger.trace(f"MAIN: END tick -------------------------")
-    time.sleep(FeatherSettings.CAN_REFRESH_RATE)
+
