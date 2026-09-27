@@ -754,18 +754,13 @@ class Application:
     def ensure_pad_operational(self):
         Logger.trace("Applcation.ensure_pad_operational")
 
-        if self.pad.state == PadState.UNKNOWN:
-            if self.first_boot:
-                self.send_pad_activate()
-                self.pad.to_operational()
-                self.controller.init_drive_state()
-                self.first_boot = False
-        elif self.pad.state in (PadState.BOOT_UP, PadState.PRE_OPERATIONAL):
+        # Always activate once at startup: the pad may still be Operational from
+        # before an ECU reset, showing LEDs that no longer match our state.
+        if self.first_boot or self.pad.state in (PadState.BOOT_UP, PadState.PRE_OPERATIONAL):
             self.send_pad_activate()
             self.pad.to_operational()
             self.controller.init_drive_state()
-        elif self.pad.state != PadState.OPERATIONAL:
-            Logger.info(f"unknown state: [{self.pad.state}]")
+            self.first_boot = False
 
 
     def send_pad_activate(self):

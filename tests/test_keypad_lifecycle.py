@@ -59,3 +59,12 @@ def test_pre_operational_heartbeat_restarts_node():
     sim.heartbeat("pre_operational")
     assert len(sim.sent(NMT_ID)) == nmt_before + 1
     assert sim.lit() == {"PARK": "blue", "NEUTRAL": "blue"}
+
+
+def test_ecu_reset_with_pad_already_operational_still_activates_and_draws_leds():
+    # The pad kept power while the ECU rebooted: its first heartbeat says
+    # Operational, but its LEDs still show the pre-reset state.
+    sim = Sim(brake="engaged")
+    sim.heartbeat("operational")
+    assert sim.sent(NMT_ID)
+    assert sim.lit() == {"PARK": "blue", "NEUTRAL": "blue"}
