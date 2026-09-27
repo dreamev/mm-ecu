@@ -1,2 +1,8 @@
 [tool.pyright]
 reportShadowedImports = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# importlib mode keeps the repo root off the front of sys.path, so the firmware's
+# code.py never shadows the stdlib `code` module (which pdb imports).
+addopts = "--import-mode=importlib"
