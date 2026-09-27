@@ -12,7 +12,7 @@ are padded/truncated to 8 data bytes.
 
 ## Key-state bitmask
 ```python
-mask = data[0] | (data[1] << 8)
+mask = data[0] | (data[1] << 8)          # keypad.decode_pressed_keys; None if len < 2
 pressed = [n for n in range(1, 13) if mask >> (n - 1) & 1]
 ```
 The pad reports the *current* set of held keys on every change, so a release
@@ -21,10 +21,12 @@ produces an all-zero frame (which the ECU ignores).
 ## LED bitfield
 Red occupies bits 0–11, green 12–23, blue 24–35; within a channel bit `n-1` is key `n`.
 ```python
-value = 0
-for n, (r, g, b) in rgb_by_key.items():
-    value |= r << (n - 1) | g << (12 + n - 1) | b << (24 + n - 1)
-payload = [(value >> (8 * i)) & 0xFF for i in range(5)]
+# keypad.encode_leds: sets bits directly (no 36-bit int on the microcontroller)
+for index, rgb in enumerate(colors):          # index = key - 1
+    for channel in range(3):
+        if rgb[channel]:
+            bit = channel * 12 + index
+            payload[bit >> 3] |= 1 << (bit & 7)
 ```
 Golden example: PARK (key 2) and NEUTRAL (key 4) blue → bits 25, 27 →
 `00 00 00 0A 00 00 00 00`.
@@ -53,18 +55,22 @@ flowchart LR
 stateDiagram-v2
   [*] --> Unknown
   Unknown --> Operational: first tick → send NMT start + drive LEDs
+  note right of Unknown: first tick starts the pad even if its heartbeat already says Operational (ECU-only reset)
   Operational --> BootUp: heartbeat 00 (pad rebooted)
   BootUp --> Operational: next tick → NMT start + drive LEDs
   PreOperational --> Operational: next tick → NMT start + drive LEDs
   Operational --> PreOperational: heartbeat 7F
   BootUp --> PreOperational: heartbeat 7F
 ```
-Invariant: whenever the ECU (re)activates the pad it re-sends the LED frame,
-because a rebooted pad has lost its LED state.
+Heartbeats are matched on the exact payload (`b"\x05"` etc.). Anything else is logged
+and ignored.
 
-Lesson: the original code pushed one full LED frame per button color change
-(4 frames for a drive change). The frame is a full snapshot, so only the last
-one matters.
+Invariants:
+- Whenever the ECU (re)starts the pad it re-sends the full LED frame, because a
+  rebooted pad has lost its LED state. The LED model lives in `Keypad`, so hazard,
+  F1/F2 and the other colors survive pad reboots.
+- The LED frame is a full snapshot, so changes within a tick are coalesced into
+  one frame (`Keypad.leds_dirty`).
 
 References: datasheet and CANopen manual links are in [../../readme.md](../../readme.md).
 Related: [summary.md](summary.md), [button-behaviors.md](button-behaviors.md).

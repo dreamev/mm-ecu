@@ -6,7 +6,7 @@
   At boot, `CAN_STANDBY` is driven low and `BOOST_ENABLE` high when present.
 - Vendored library: `lib/adafruit_motor/*.mpy` (servo).
 
-## Pin map
+## Pin map (constants in `mmecu/hardware.py`)
 | Pin | Direction | Function |
 |---|---|---|
 | D11 | out | reverse relay (pulse) |

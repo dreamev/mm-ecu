@@ -20,3 +20,7 @@
 - Characterization test - black-box test pinning existing behavior before refactoring.
 - Sim - `tests/sim.py` harness driving the app through fake CircuitPython hardware.
 - Tick - one iteration of the main loop.
+- Outbox - FIFO of outbound CAN frames; one frame is sent per tick.
+- LEDs dirty - `Keypad` flag meaning the LED model changed and one full LED frame must be sent.
+- Startup drive state - drive LEDs/state drawn on every keypad (re)start.
+- mmecu - the hardware-free firmware package; `mmecu.hardware` is its only hardware edge.

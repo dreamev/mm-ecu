@@ -2,16 +2,23 @@
 
 - [summary.md](summary.md) — one-paragraph snapshot of the system
 - [terminology.md](terminology.md) — domain vocabulary
-- [practices.md](practices.md) — coding, testing and workflow conventions
-- plans/
-  - [refactor-plan.md](plans/refactor-plan.md) — test + refactor roadmap, open questions for the human
+- [practices.md](practices.md) — CircuitPython-subset rules, test conventions, workflow
+- architecture/
+  - [summary.md](architecture/summary.md) — module map, tick sequence, DI contracts
 - keypad/
   - [summary.md](keypad/summary.md) — keypad domain overview
-  - [can-protocol.md](keypad/can-protocol.md) — CANopen IDs, key bitmask, LED bitfield, node states
-  - [button-behaviors.md](keypad/button-behaviors.md) — per-key behavior vs requirements
+  - [can-protocol.md](keypad/can-protocol.md) — CANopen IDs, key bitmask, LED bitfield, node state machine
+  - [button-behaviors.md](keypad/button-behaviors.md) — per-key behavior vs requirements, dispatch contract
 - vehicle/
-  - [drive-selection.md](vehicle/drive-selection.md) — PRND radio group, shift relays, parking brake
-  - [battery-gauge.md](vehicle/battery-gauge.md) — 0x126 decode, servo mapping, throttling
+  - [summary.md](vehicle/summary.md) — vehicle systems overview
+  - [drive-selection.md](vehicle/drive-selection.md) — PRND radio group, blocking relay pulse, parking brake, startup LEDs
+  - [battery-gauge.md](vehicle/battery-gauge.md) — 0x126 decode, clamping, servo throttling
 - platform/
+  - [summary.md](platform/summary.md) — platform overview
   - [hardware.md](platform/hardware.md) — board, pin map, CircuitPython constraints
+  - [dev-workflow.md](platform/dev-workflow.md) — make targets, deploy contract
+- testing/
+  - [summary.md](testing/summary.md) — test layers, Sim API, fakes contract, the code.py/stdlib shadowing lesson
+- plans/
+  - [roadmap.md](plans/roadmap.md) — open questions for the human, unimplemented requirements, follow-ups
 - tmp/ — git-ignored session scraps

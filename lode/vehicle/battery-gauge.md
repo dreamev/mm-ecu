@@ -10,9 +10,10 @@ BO_ 294 DI_hvBusStatus: 3 VEH        (0x126)
   SG_ DI_current : 10|11@1+ (1,0) [0|2047] "A"
 ```
 ```python
-volts = ((data[1] & 0x03) << 8 | data[0]) * 0.5
-fraction = (volts - 325) / (400 - 325)  # MIN/MAX_BATTERY_VOLTAGE (TODO: calibrate)
-angle = 119 * fraction  # MAX_ANGLE * fraction
+# mmecu/battery.py
+volts = (data[0] | (data[1] & 0x03) << 8) * 0.5           # decode_hv_bus_voltage
+fraction = min(max((volts - 325) / (400 - 325), 0.0), 1.0)  # charge_fraction, EMPTY/FULL_VOLTS
+angle = 119 * fraction                                     # BatteryGauge.MAX_ANGLE * fraction
 ```
 
 ## Update throttling
@@ -28,10 +29,14 @@ flowchart TD
   C -- no --> X[skip]
 ```
 
+Implementation: a reading counter starts at `UPDATE_EVERY - 1`, so the first
+reading moves the needle, and it resets to 0 on every move.
+
 ## Invariants
 - The adafruit servo raises `ValueError` for angles outside 0–180, which would halt
-  `code.py`. The fraction must therefore be clamped to [0, 1] before mapping.
+  `code.py`. `charge_fraction` therefore clamps to [0, 1] before mapping.
+- Payloads shorter than 2 bytes are ignored with a warning.
 - Open question: `MIN_ANGLE` (57) is not used in the mapping; see
-  [../plans/refactor-plan.md](../plans/refactor-plan.md).
+  [../plans/roadmap.md](../plans/roadmap.md).
 
 Related: [../platform/hardware.md](../platform/hardware.md).

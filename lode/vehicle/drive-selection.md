@@ -11,7 +11,7 @@ of the four drive LEDs is blue after any drive key press.
 | NEUTRAL | D12 | unchanged |
 | DRIVE | D13 | disengage |
 
-A relay pulse is `True`, **blocking** `sleep(0.5)`, `False`. The relay command is
+A relay pulse is `True`, **blocking** `sleep(0.5)` (injected), `False`. The relay command is
 sent on every press, even if the state is unchanged; LEDs only change when the
 state changes.
 
@@ -42,18 +42,22 @@ Two sensor inputs (pull-up) and two level-held trigger outputs:
 | D5 | trigger disengage (output, held) |
 
 ```python
-def engage(self):
+def engage(self):  # mmecu/parking_brake.py
     if not self.engaged:
-        self.disengage_out.value = False
-        self.engage_out.value = True
+        self._disengage_out.value = False
+        self._engage_out.value = True
         self.engaged = True
 ```
 Boot: if the engaged sensor reads high → `engage()`; elif disengaged sensor high →
 `disengage()` (a no-op since `engaged` starts False, so triggers stay low);
 else log an error. Both high (e.g. unplugged, pull-ups) → treated as engaged.
 
-## Boot LEDs (current behavior, see open question 1 in
-[../plans/refactor-plan.md](../plans/refactor-plan.md))
-NEUTRAL is always blue; PARK is blue iff the brake is engaged; `drive_state` is PARK.
+## Startup LEDs (`VehicleController.show_startup_drive_state`)
+Drawn on every keypad (re)start: NEUTRAL is always blue, PARK is blue iff the
+brake is engaged, and `drive_state` becomes PARK if the brake is engaged.
+Open question 1 in [../plans/roadmap.md](../plans/roadmap.md) covers whether this is intended.
+
+Code: `mmecu/drivetrain.py` (`Shifter`), `mmecu/parking_brake.py`,
+`mmecu/controller.py` (`select_*`, `_change_drive_state`).
 
 Related: [../keypad/button-behaviors.md](../keypad/button-behaviors.md), [../platform/hardware.md](../platform/hardware.md).

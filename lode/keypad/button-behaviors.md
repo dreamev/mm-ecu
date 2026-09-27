@@ -22,6 +22,7 @@ white, black (off). "Orange" is not representable.
 
 ## Dispatch contract
 - A key-state frame may report several held keys; each is handled in key order 1→12.
+- Keys with no handler (REGEN, AUTOPILOT_*) are logged at debug and ignored.
 - Only presses are acted on; there is no press/release edge detection, so a frame that
   repeats a held key re-triggers it.
 
