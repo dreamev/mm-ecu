@@ -207,7 +207,7 @@ class ECU:
     DRIVE_SHIFT_ID = 0x697
 
     def __init__(self, reverse_pin, neutral_pin, drive_pin):
-        self.hazard = ECUState.ENABLED
+        self.hazard = ECUState.DISABLED
         self.drive_state = ECUState.PARK
         self.exhaust_sound = ECUState.DISABLED
         self.power_state = ECUState.LOW_POWER
@@ -635,6 +635,7 @@ class VehicleController:
         state = getattr(self.ecu, device)
         new_state = ECUState.ENABLED if state == ECUState.DISABLED else ECUState.DISABLED
         Logger.debug(f"Switching device state {new_state}")
+        setattr(self.ecu, device, new_state)
         color = 'yellow' if new_state == ECUState.ENABLED else 'black'
         self.set_button_color(button, color)
 

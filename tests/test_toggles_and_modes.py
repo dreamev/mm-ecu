@@ -43,7 +43,6 @@ def test_key_release_frame_does_nothing():
     assert len(sim.sent()) == before
 
 
-@pytest.mark.xfail(strict=True, reason="bug: toggle state is never stored, hazard never lights")
 def test_hazard_toggles_on_and_off():
     sim = Sim().boot()
     sim.press("HAZARD")
@@ -52,7 +51,6 @@ def test_hazard_toggles_on_and_off():
     assert sim.lit() == BOOT_LEDS
 
 
-@pytest.mark.xfail(strict=True, reason="bug: toggle state is never stored, exhaust never turns off")
 def test_exhaust_sound_toggles_on_and_off():
     sim = Sim().boot()
     sim.press("EXHAUST_SOUND")
