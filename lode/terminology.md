@@ -1,0 +1,22 @@
+# Terminology
+
+- ECU - this firmware / Feather board acting as the vehicle's auxiliary control unit.
+- Pad / keypad - Blink Marine PKP-2600-SI 12-key CANopen keypad with RGB LEDs.
+- Key number - physical keypad position 1–12 (1 = Hazard … 12 = Cruise down).
+- Node ID - CANopen address of the keypad, `0x15`.
+- NMT start - CANopen command (`0x000`, `01 00`) moving nodes to Operational.
+- Heartbeat - periodic keypad frame on `0x715` reporting its node state.
+- Boot-up / Pre-operational / Operational - CANopen node states (`00` / `7F` / `05`).
+- TPDO1 / key-state frame - `0x195`, bitmask of currently held keys.
+- RPDO1 / LED frame - `0x215`, 36-bit RGB bitfield for all 12 keys.
+- Drive state - PARK / REVERSE / NEUTRAL / DRIVE selection.
+- Shift relay - GPIO output pulsed 0.5 s to request R/N/D from the drive unit.
+- Parking brake triggers - held outputs D6 (engage) / D5 (disengage).
+- DI_hvBusStatus - Tesla drive-unit frame `0x126` carrying HV bus voltage.
+- Gauge - servo needle showing battery state of charge.
+- F1 / F2 - performance modes (slow / fast); radio group.
+- Regen - regenerative braking toggle.
+- Autopilot / Cruise - openpilot cruise toggle and speed up/down keys.
+- Characterization test - black-box test pinning existing behavior before refactoring.
+- Sim - `tests/sim.py` harness driving the app through fake CircuitPython hardware.
+- Tick - one iteration of the main loop.

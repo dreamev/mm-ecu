@@ -4,3 +4,10 @@
 .vscode/*
 System Volume Information/*
 code-old.py
+
+# local dev
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+lode/tmp/
