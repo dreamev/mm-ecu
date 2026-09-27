@@ -25,14 +25,12 @@ def test_gauge_then_moves_only_every_hundredth_reading():
     assert sim.gauge.angle == pytest.approx(119)
 
 
-@pytest.mark.xfail(strict=True, reason="bug: voltage below range drives servo negative and raises")
 def test_voltage_below_range_pins_gauge_to_empty():
     sim = Sim().boot()
     sim.hv_bus(300)
     assert sim.gauge.angle == 0
 
 
-@pytest.mark.xfail(strict=True, reason="bug: voltage far above range exceeds servo range and raises")
 def test_voltage_above_range_pins_gauge_to_full():
     sim = Sim().boot()
     sim.hv_bus(480)

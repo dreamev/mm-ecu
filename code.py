@@ -393,6 +393,8 @@ class TeslaECU:
         Logger.trace("TeslaECU.battery_percentage")
 
         percentage = (voltage - self.MIN_BATTERY_VOLTAGE) / (self.MAX_BATTERY_VOLTAGE - self.MIN_BATTERY_VOLTAGE)
+        # Out-of-range voltages would drive the servo outside 0-180 and raise
+        percentage = min(max(percentage, 0.0), 1.0)
         Logger.debug(f"battery percentage : {percentage}")
         return percentage
 
