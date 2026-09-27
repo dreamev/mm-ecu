@@ -828,6 +828,10 @@ class Application:
     def _process_pad_button(self, message):
         Logger.trace("Applcation._process_pad_button")
 
+        if len(message.data) < 2:
+            Logger.warning(f"short key-state payload: {message.data}")
+            return
+
         button_names = PadButton.get_button_names()
         pressed_buttons = Pad.decode_button_press(message.data)
 
@@ -839,6 +843,10 @@ class Application:
 
     def _process_battery_state(self, message):
         Logger.trace("Application._process_battery_state")
+
+        if len(message.data) < 2:
+            Logger.warning(f"short battery payload: {message.data}")
+            return
 
         battery_percentage = self.tesla_ecu.decode_battery_state_to_percentage(message.data)
         self.battery_gauge.update_battery_gauge(battery_percentage)

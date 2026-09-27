@@ -59,7 +59,6 @@ def test_exhaust_sound_toggles_on_and_off():
     assert sim.lit() == BOOT_LEDS
 
 
-@pytest.mark.xfail(strict=True, reason="bug: short key-state payload raises IndexError")
 def test_short_key_state_payload_is_ignored():
     sim = Sim().boot()
     before = len(sim.sent())

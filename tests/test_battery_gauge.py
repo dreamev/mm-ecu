@@ -35,3 +35,10 @@ def test_voltage_above_range_pins_gauge_to_full():
     sim = Sim().boot()
     sim.hv_bus(480)
     assert sim.gauge.angle == pytest.approx(119)
+
+
+def test_short_hv_bus_payload_is_ignored():
+    sim = Sim().boot()
+    sim.receive(0x126, [0x10])
+    sim.tick()
+    assert sim.gauge.angle == 88
