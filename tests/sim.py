@@ -22,14 +22,30 @@ HV_BUS_ID = 0x126
 HEARTBEAT = {"boot_up": 0x00, "pre_operational": 0x7F, "operational": 0x05}
 
 KEYS = [
-    "HAZARD", "PARK", "REVERSE", "NEUTRAL", "DRIVE", "AUTOPILOT_SPEED_UP",
-    "EXHAUST_SOUND", "F1", "F2", "REGEN", "AUTOPILOT_ON", "AUTOPILOT_SPEED_DOWN",
+    "HAZARD",
+    "PARK",
+    "REVERSE",
+    "NEUTRAL",
+    "DRIVE",
+    "AUTOPILOT_SPEED_UP",
+    "EXHAUST_SOUND",
+    "F1",
+    "F2",
+    "REGEN",
+    "AUTOPILOT_ON",
+    "AUTOPILOT_SPEED_DOWN",
 ]
 KEY_NUMBER = {name: n for n, name in enumerate(KEYS, start=1)}
 
 COLOR_NAMES = {
-    (0, 0, 0): "black", (1, 0, 0): "red", (0, 1, 0): "green", (0, 0, 1): "blue",
-    (1, 1, 0): "yellow", (0, 1, 1): "cyan", (1, 0, 1): "magenta", (1, 1, 1): "white",
+    (0, 0, 0): "black",
+    (1, 0, 0): "red",
+    (0, 1, 0): "green",
+    (0, 0, 1): "blue",
+    (1, 1, 0): "yellow",
+    (0, 1, 1): "cyan",
+    (1, 0, 1): "magenta",
+    (1, 1, 1): "white",
 }
 
 RELAYS = {"D11": "REVERSE", "D12": "NEUTRAL", "D13": "DRIVE"}
@@ -73,29 +89,10 @@ class FakeTime:
 
 
 # --- construction (the only firmware-specific part) -----------------------
-class _LegacyApp:
-    """Adapts the original monolithic code.py (classes only, main loop stripped)."""
-
-    def __init__(self, clock):
-        import os
-
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "code.py")
-        source = open(path).read().split("####################\n### Main Program")[0]
-        self.ns = {"__name__": "legacy_code"}
-        exec(compile(source, path, "exec"), self.ns)
-        self.ns["time"] = clock
-        self.ns["Logger"].current_level = self.ns["Logger"].WARNING
-        self.app = self.ns["Application"]()
-
-    def tick(self):
-        self.app.process_can_bus()
-        self.app.process_can_message()
-        self.app.ensure_pad_operational()
-        self.app.process_can_message_queue()
-
-
 def _build_app(clock):
-    return _LegacyApp(clock)
+    from mmecu import hardware
+
+    return hardware.build_application(sleep=clock.sleep)
 
 
 class Sim:

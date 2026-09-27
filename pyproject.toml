@@ -6,3 +6,14 @@ testpaths = ["tests"]
 # importlib mode keeps the repo root off the front of sys.path, so the firmware's
 # code.py never shadows the stdlib `code` module (which pdb imports).
 addopts = "--import-mode=importlib"
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"  # closest CPython to the CircuitPython 7 language subset
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "SIM", "C4", "RET", "PIE"]
+
+[tool.ruff.lint.isort]
+known-third-party = ["board", "canio", "digitalio", "pwmio", "adafruit_motor"]
+known-first-party = ["mmecu", "tests"]

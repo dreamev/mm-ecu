@@ -33,6 +33,10 @@ class DigitalInOut:
         self._value = False
         pins[self.name] = self
 
+    def switch_to_input(self, pull=None):
+        self.direction = Direction.INPUT
+        self.pull = pull
+
     def switch_to_output(self, value=False):
         self.direction = Direction.OUTPUT
         self.value = value

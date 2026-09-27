@@ -11,8 +11,8 @@ BO_ 294 DI_hvBusStatus: 3 VEH        (0x126)
 ```
 ```python
 volts = ((data[1] & 0x03) << 8 | data[0]) * 0.5
-fraction = (volts - 325) / (400 - 325)       # MIN/MAX_BATTERY_VOLTAGE (TODO: calibrate)
-angle = 119 * fraction                        # MAX_ANGLE * fraction
+fraction = (volts - 325) / (400 - 325)  # MIN/MAX_BATTERY_VOLTAGE (TODO: calibrate)
+angle = 119 * fraction  # MAX_ANGLE * fraction
 ```
 
 ## Update throttling
