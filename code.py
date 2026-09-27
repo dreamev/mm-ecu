@@ -468,6 +468,13 @@ class Pad:
         else:
             Logger.info(f"Transition to Operational is not allowed from {self.state}")
 
+    def to_pre_operational(self):
+        Logger.trace("Pad.to_pre_operational")
+
+        if self.state != PadState.PRE_OPERATIONAL:
+            self.state = PadState.PRE_OPERATIONAL
+            Logger.info("Pad is now in Pre-operational.")
+
     def reset(self):
         Logger.trace("Pad.reset")
 
@@ -753,7 +760,7 @@ class Application:
                 self.pad.to_operational()
                 self.controller.init_drive_state()
                 self.first_boot = False
-        elif self.pad.state == PadState.BOOT_UP:
+        elif self.pad.state in (PadState.BOOT_UP, PadState.PRE_OPERATIONAL):
             self.send_pad_activate()
             self.pad.to_operational()
             self.controller.init_drive_state()

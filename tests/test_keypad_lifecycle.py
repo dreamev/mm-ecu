@@ -1,7 +1,5 @@
 """Keypad node management: activation, heartbeats, LED restoration."""
 
-import pytest
-
 from tests.sim import LED_ID, NMT_ID, Sim
 
 
@@ -55,7 +53,6 @@ def test_pad_reboot_redraws_boot_drive_leds_not_current_selection():
     assert sim.lit() == {"NEUTRAL": "blue"}
 
 
-@pytest.mark.xfail(strict=True, reason="bug: pre-operational heartbeat raises AttributeError")
 def test_pre_operational_heartbeat_restarts_node():
     sim = Sim().boot()
     nmt_before = len(sim.sent(NMT_ID))
