@@ -11,6 +11,7 @@ code.py          entrypoint CircuitPython runs at boot (boot + main loop only)
 mmecu/           firmware logic; only mmecu/hardware.py touches pins/CAN
 lib/             vendored CircuitPython libraries (adafruit_motor)
 tests/           pytest suite running the firmware against fake hardware
+qa/              host-side hardware QA harness (make qa); not deployed
 lode/            project knowledge base (protocols, wiring, design notes)
 ```
 
@@ -21,7 +22,11 @@ make lint        # ruff
 make deploy      # test + copy firmware to the mounted CIRCUITPY drive
 make watch       # redeploy on every save (needs fswatch)
 make console     # serial console, 115200 baud (PORT=/dev/... to override)
+make qa          # guided hardware QA: press what it says, it checks the firmware's events
 ```
+`make qa` walks through every key, the relays, the parking brake, a keypad reboot
+and the gauge on the real hardware, and writes a report to `qa-reports/`. It moves the
+shift relays and brake, so only run it with the vehicle secured.
 The CIRCUITPY drive is auto-detected on macOS and Linux; set `CIRCUITPY=/path`
 otherwise. Firmware code must stay within the CircuitPython 7 subset (no
 `typing`, `dataclasses`, `enum`, annotations); `make test` enforces this.

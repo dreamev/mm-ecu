@@ -19,6 +19,9 @@ flowchart LR
   example frames (§ numbers cited). If one fails, the firmware disagrees with the vendor.
 - **Protocol units** (`test_protocol_units`): LED encoding for every key × color,
   key decoding, frame padding, voltage decode, clamping and heartbeat states.
+- **Events + QA harness** (`test_events`, `test_qa_harness`, `test_qa_serial`): the event
+  stream format, the whole `make qa` script replayed on the simulator, and the serial console
+  over a pty. See [../qa/summary.md](../qa/summary.md).
 - **Entrypoint** (`test_entrypoint`): runs `code.py` with `runpy` and a stub app
   that stops after 3 ticks.
 - **CircuitPython guard** (`test_circuitpython_compat`): import allowlist,
@@ -31,13 +34,15 @@ sim.press("DRIVE")                      # tap: press frame + release frame, like
 sim.hold("DRIVE", "F1")                 # level frame for exactly these keys (no release)
 sim.wait(1.5)                           # advance the fake monotonic clock (hold timing)
 sim.actions.calls                       # [("set_regen", True), ...] via RecordingActions
+sim.events("relay")                     # parsed EVT lines the firmware emitted
 sim.heartbeat("boot_up"); sim.hv_bus(362.5, count=1)
 sim.lit()        # {"DRIVE": "blue"}  decoded from the last LED frame
 sim.pulses()     # [("DRIVE", 0.5)]   relay high time from the fake clock
 sim.brake_outputs(); sim.gauge.angle; sim.sent(can_id)
 ```
-The protocol helpers in `sim.py` (`key_state_payload`, `decode_leds`,
-`hv_bus_payload`) are written from the spec, independently of `mmecu`.
+The protocol helpers (`qa/spec.py`: `KEYS`, `key_state_payload`, `decode_leds`; and
+`sim.hv_bus_payload`) are written from the spec, independently of `mmecu`. They are
+shared by the simulator and the QA harness.
 
 `RecordingActions` replaces `VehicleActions` and raises on any action name that
 `VehicleActions` does not define, so a typo in the controller fails the tests.

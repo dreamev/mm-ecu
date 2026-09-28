@@ -16,7 +16,7 @@ unchanged on CPython under test.
 | `mmecu/parking_brake.py` | `ParkingBrake` (sensor sync at boot, held triggers) |
 | `mmecu/battery.py` | 0x126 decode, clamped `charge_fraction`, throttled `BatteryGauge` |
 | `mmecu/can.py` | `frame_data` (8-byte padding), `Outbox` FIFO |
-| `mmecu/log.py` | syslog-level `print` logging |
+| `mmecu/log.py` | syslog-level `print` logging; `event()` structured `EVT` lines for QA ([../qa/summary.md](../qa/summary.md)) |
 
 ```mermaid
 flowchart TD

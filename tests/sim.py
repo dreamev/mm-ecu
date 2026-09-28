@@ -12,6 +12,10 @@ import canio
 import digitalio
 from adafruit_motor import servo
 
+from mmecu import log
+from qa.events import parse_line
+from qa.spec import COLOR_NAMES, KEY_NUMBER, KEYS, decode_leds, key_state_payload  # noqa: F401  re-exported
+
 # --- spec-derived protocol constants --------------------------------------
 NMT_ID = 0x000
 HEARTBEAT_ID = 0x715
@@ -21,54 +25,11 @@ HV_BUS_ID = 0x126
 
 HEARTBEAT = {"boot_up": 0x00, "stopped": 0x04, "pre_operational": 0x7F, "operational": 0x05}
 
-KEYS = [
-    "HAZARD",
-    "PARK",
-    "REVERSE",
-    "NEUTRAL",
-    "DRIVE",
-    "AUTOPILOT_SPEED_UP",
-    "EXHAUST_SOUND",
-    "F1",
-    "F2",
-    "REGEN",
-    "AUTOPILOT_ON",
-    "AUTOPILOT_SPEED_DOWN",
-]
-KEY_NUMBER = {name: n for n, name in enumerate(KEYS, start=1)}
-
-COLOR_NAMES = {
-    (0, 0, 0): "black",
-    (1, 0, 0): "red",
-    (0, 1, 0): "green",
-    (0, 0, 1): "blue",
-    (1, 1, 0): "yellow",
-    (0, 1, 1): "cyan",
-    (1, 0, 1): "magenta",
-    (1, 1, 1): "white",
-}
-
 RELAYS = {"D11": "REVERSE", "D12": "NEUTRAL", "D13": "DRIVE"}
 BRAKE_ENGAGED_SENSOR = "D10"
 BRAKE_DISENGAGED_SENSOR = "D9"
 BRAKE_ENGAGE_OUT = "D6"
 BRAKE_DISENGAGE_OUT = "D5"
-
-
-def key_state_payload(*names):
-    mask = 0
-    for name in names:
-        mask |= 1 << (KEY_NUMBER[name] - 1)
-    return [mask & 0xFF, mask >> 8]
-
-
-def decode_leds(payload):
-    value = int.from_bytes(bytes(payload[:5]), "little")
-    leds = {}
-    for n, name in enumerate(KEYS, start=1):
-        rgb = tuple((value >> (channel * 12 + n - 1)) & 1 for channel in range(3))
-        leds[name] = COLOR_NAMES[rgb]
-    return leds
 
 
 def hv_bus_payload(volts):
@@ -121,6 +82,8 @@ class Sim:
         }[brake]
         digitalio.input_levels[BRAKE_ENGAGED_SENSOR] = levels[0]
         digitalio.input_levels[BRAKE_DISENGAGED_SENSOR] = levels[1]
+        self.event_lines = []
+        log.set_event_sink(self.event_lines.append)
         self.clock = FakeTime()
         self.actions = RecordingActions()
         self.app = _build_app(self.clock, self.actions)
@@ -183,6 +146,10 @@ class Sim:
         frames = self.sent(LED_ID)
         assert frames, "no LED frame sent yet"
         return decode_leds(frames[-1][1])
+
+    def events(self, name=None):
+        parsed = [parse_line(line) for line in self.event_lines]
+        return [event for event in parsed if name is None or event.name == name]
 
     def lit(self):
         return {name: color for name, color in self.leds().items() if color != "black"}

@@ -14,9 +14,13 @@ import canio  # noqa: E402  fake, from tests/fakes
 import digitalio  # noqa: E402
 from adafruit_motor import servo  # noqa: E402
 
+from mmecu import log  # noqa: E402
+
 
 @pytest.fixture(autouse=True)
 def _reset_fake_hardware():
     canio.reset()
     digitalio.reset()
     servo.reset()
+    yield
+    log.set_event_sink(print)

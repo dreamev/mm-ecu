@@ -2,6 +2,7 @@
 
 from mmecu import battery, keypad, log
 from mmecu.can import Outbox
+from mmecu.drivetrain import DriveState
 
 LISTEN_IDS = (battery.HV_BUS_STATUS_ID, keypad.HEARTBEAT_ID, keypad.KEY_STATE_ID)
 
@@ -30,7 +31,9 @@ class Application:
             self._dispatch(message)
         self._ensure_pad_started()
         if self.pad.leds_dirty:
-            self.outbox.push(keypad.LED_ID, self.pad.led_payload())
+            payload = self.pad.led_payload()
+            self.outbox.push(keypad.LED_ID, payload)
+            log.event("leds", payload="".join(f"{byte:02x}" for byte in payload))
         frame = self.outbox.pop()
         if frame is not None:
             self.bus.send(*frame)
@@ -38,7 +41,7 @@ class Application:
     def _watch_bus_state(self):
         state = self.bus.state
         if state != self._bus_state:
-            log.info(f"CAN bus state: {state}")
+            log.event("can_bus", state=state)
             self._bus_state = state
 
     def _dispatch(self, message):
@@ -53,6 +56,13 @@ class Application:
         # Operational but showing LEDs from before the reset.
         if self._pad_started and not self.pad.needs_start():
             return
+        if not self._pad_started:
+            log.event(
+                "ecu_start",
+                drive=DriveState.NAMES[self.controller.drive_state],
+                brake=int(self.controller.parking_brake.engaged),
+            )
+        log.event("keypad_start", reason=self.pad.state)
         self.outbox.push(keypad.NMT_ID, keypad.NMT_START_ALL_NODES)
         self.pad.mark_started()
         self.controller.keypad_restarted()

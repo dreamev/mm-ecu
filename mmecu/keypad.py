@@ -132,5 +132,5 @@ class Keypad:
         if state is None:
             log.info(f"unknown keypad heartbeat: {data}")
         elif state != self.state:
-            log.info(f"keypad is now {state}")
+            log.event("keypad_state", state=state)
             self.state = state

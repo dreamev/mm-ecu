@@ -15,6 +15,8 @@
    yellow (as does hazard). REGEN already uses white.
 
 ## Needs bench verification (not provable in the simulator)
+`make qa` covers the keypad, relays, brake, toggles, holds, keypad reboot and gauge
+steps; the items below need extra attention during it.
 - Firmware fits in RAM with the multi-module `mmecu/` layout (fallback: `mpy-cross`).
 - Boot drive state: with the brake released the ECU *displays* NEUTRAL but cannot read
   the drive unit's actual gear, and pulses no relay. Confirm this is the right display.

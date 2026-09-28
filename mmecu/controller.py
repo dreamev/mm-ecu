@@ -62,6 +62,7 @@ class VehicleController:
 
     def key_pressed(self, key):
         self._pressed_at[key] = self._clock()
+        log.event("key_down", key=key)
         handler = self._on_press.get(key)
         if handler is None:
             log.debug(f"no action for key {key}")
@@ -70,9 +71,13 @@ class VehicleController:
 
     def key_released(self, key):
         pressed_at = self._pressed_at.pop(key, None)
+        if pressed_at is None:
+            return
+        held_seconds = self._clock() - pressed_at
+        log.event("key_up", key=key, held=f"{held_seconds:.2f}")
         handler = self._on_release.get(key)
-        if handler is not None and pressed_at is not None:
-            handler(self._clock() - pressed_at)
+        if handler is not None:
+            handler(held_seconds)
 
     def keypad_restarted(self):
         """The pad was (re)started: abandon holds in progress and redraw the drive state."""
@@ -109,27 +114,32 @@ class VehicleController:
         if state == self.drive_state:
             return
         self.drive_state = state
+        log.event("drive", state=DriveState.NAMES[state])
         self.show_drive_state()
 
     # -- toggles --
     def toggle_hazard(self):
         self.hazard = not self.hazard
         self.keypad.set_color(Key.HAZARD, TOGGLE_COLOR if self.hazard else Color.BLACK)
+        log.event("hazard", on=int(self.hazard))
         self.actions.set_hazard(self.hazard)
 
     def toggle_exhaust_sound(self):
         self.exhaust_sound = not self.exhaust_sound
         self.keypad.set_color(Key.EXHAUST_SOUND, TOGGLE_COLOR if self.exhaust_sound else Color.BLACK)
+        log.event("exhaust_sound", on=int(self.exhaust_sound))
         self.actions.set_exhaust_sound(self.exhaust_sound)
 
     def toggle_regen(self):
         self.regen = not self.regen
         self.keypad.set_color(Key.REGEN, REGEN_COLOR if self.regen else Color.BLACK)
+        log.event("regen", on=int(self.regen))
         self.actions.set_regen(self.regen)
 
     def toggle_cruise(self):
         self.cruise = not self.cruise
         self.keypad.set_color(Key.AUTOPILOT_ON, CRUISE_COLOR if self.cruise else Color.BLACK)
+        log.event("cruise", on=int(self.cruise))
         self.actions.set_cruise(self.cruise)
 
     # -- power modes (radio group) --
@@ -137,12 +147,14 @@ class VehicleController:
         self.power_mode = PowerMode.LOW
         self.keypad.set_color(Key.F1, F1_COLOR)
         self.keypad.set_color(Key.F2, Color.BLACK)
+        log.event("power_mode", mode=PowerMode.LOW)
         self.actions.set_power_mode(PowerMode.LOW)
 
     def select_f2(self):
         self.power_mode = PowerMode.HIGH
         self.keypad.set_color(Key.F2, F2_COLOR)
         self.keypad.set_color(Key.F1, Color.BLACK)
+        log.event("power_mode", mode=PowerMode.HIGH)
         self.actions.set_power_mode(PowerMode.HIGH)
 
     # -- cruise speed (lit while held, acts on release) --
@@ -151,6 +163,7 @@ class VehicleController:
 
     def finish_speed_up(self, held_seconds):
         self.keypad.set_color(Key.AUTOPILOT_SPEED_UP, Color.BLACK)
+        log.event("cruise_adjust", direction=1, held=f"{held_seconds:.2f}")
         self.actions.adjust_cruise_speed(1, held_seconds)
 
     def start_speed_down(self):
@@ -158,4 +171,5 @@ class VehicleController:
 
     def finish_speed_down(self, held_seconds):
         self.keypad.set_color(Key.AUTOPILOT_SPEED_DOWN, Color.BLACK)
+        log.event("cruise_adjust", direction=-1, held=f"{held_seconds:.2f}")
         self.actions.adjust_cruise_speed(-1, held_seconds)

@@ -14,6 +14,8 @@
   add per-method trace logs.
 - Constants live next to the code that owns them (CAN IDs in the protocol module,
   pins in `hardware.py`).
+- Every new observable behavior emits a `log.event(...)` and gets a QA step in
+  `qa/steps.py` (see [qa/summary.md](qa/summary.md)). Event values must not contain spaces.
 
 ## Tests
 - Black-box behavior tests go through `tests/sim.py` (`Sim` = app + fake hardware).

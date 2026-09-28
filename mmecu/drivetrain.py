@@ -11,6 +11,8 @@ class DriveState:
     NEUTRAL = 2
     DRIVE = 3
 
+    NAMES = ("PARK", "REVERSE", "NEUTRAL", "DRIVE")
+
 
 class Shifter:
     """Requests REVERSE/NEUTRAL/DRIVE from the drive unit by pulsing one relay.
@@ -28,7 +30,7 @@ class Shifter:
         if relay is None:
             log.info(f"no shift relay for drive state {state}")
             return
-        log.debug(f"pulsing shift relay for drive state {state}")
         relay.value = True
         self._sleep(PULSE_SECONDS)
         relay.value = False
+        log.event("relay", state=DriveState.NAMES[state])

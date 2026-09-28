@@ -41,6 +41,6 @@ class BatteryGauge:
         self._readings += 1
         if self._readings >= self.UPDATE_EVERY:
             angle = self.MAX_ANGLE * fraction
-            log.debug(f"battery gauge: fraction {fraction} angle {angle}")
             self._servo.angle = angle
+            log.event("gauge", fraction=f"{fraction:.3f}", angle=f"{angle:.1f}")
             self._readings = 0

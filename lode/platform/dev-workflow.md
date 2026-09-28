@@ -14,6 +14,7 @@ flowchart LR
 | `make deploy` | `check`, then `./sync.sh` |
 | `make watch` | `./sync.sh --watch` (fswatch), no tests |
 | `make console` | `screen <port> 115200`; `PORT=` overrides |
+| `make qa` | guided hardware QA on the real keypad ([../qa/summary.md](../qa/summary.md)); `ARGS=`, `PORT=` |
 
 ## Deploy contract (`sync.sh`)
 - Finds the drive via `$CIRCUITPY`, `/Volumes/CIRCUITPY`, `/run/media/$USER/CIRCUITPY`

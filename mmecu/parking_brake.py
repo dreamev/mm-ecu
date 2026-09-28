@@ -25,9 +25,11 @@ class ParkingBrake:
             self._disengage_out.value = False
             self._engage_out.value = True
             self.engaged = True
+            log.event("brake", engaged=1)
 
     def disengage(self):
         if self.engaged:
             self._engage_out.value = False
             self._disengage_out.value = True
             self.engaged = False
+            log.event("brake", engaged=0)

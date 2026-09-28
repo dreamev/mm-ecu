@@ -20,6 +20,8 @@
   - [dev-workflow.md](platform/dev-workflow.md) — make targets, deploy contract
 - testing/
   - [summary.md](testing/summary.md) — test layers, Sim API, fakes contract, the code.py/stdlib shadowing lesson
+- qa/
+  - [summary.md](qa/summary.md) — `make qa` guided bench test: firmware event vocabulary, step contract, sim replay
 - plans/
   - [roadmap.md](plans/roadmap.md) — open questions for the human, bench-verification checklist, unimplemented requirements, follow-ups
 - tmp/ — git-ignored session scraps
