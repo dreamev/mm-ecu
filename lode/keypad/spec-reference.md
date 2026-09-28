@@ -27,12 +27,14 @@ A keypad fresh from the factory is silent on this 500 k bus until reconfigured a
 | 300h+n = 315h | → pad | LED **blink**, same bit layout as 215h. Blink on an already-ON LED = alternate mode |
 | 400h+n = 415h | → pad | key LED brightness, b0 00–3Fh |
 | 500h+n = 515h | → pad | backlight brightness, b0 00–3Fh |
-| 580h+n / 600h+n | ↔ | SDO reply / request (config objects above) |
+| 580h+n / 600h+n | ↔ | SDO reply / request (config objects above). The ECU reads 2000h/1 (key levels, §15) after every start |
 | 700h+n = 715h | pad → | boot-up (`00`) and heartbeat: `00` boot-up, `04` stopped, `05` operational, `7F` pre-op |
 
 ## Behavioral facts the firmware depends on
 - Key-state frames are sent **on every press or release** (and every period if §41b
-  is enabled). They carry levels, not events, so the ECU must detect rising edges.
+  is enabled). They carry levels, not events, so the ECU must detect rising edges, and
+  it must learn which keys are already down after a start (the SDO read of 2000h, §15).
+  Bench check: the pad answers that read (`make qa` startup expects `keypad_baseline source=sdo`).
 - Boot-up (`715: 00`) means the pad is now in Pre-operational. Key frames and LED
   commands only work once the pad is Operational (after NMT start).
 - The heartbeat is off by default, so `7F`/`05`/`04` only arrive if §25 is configured.

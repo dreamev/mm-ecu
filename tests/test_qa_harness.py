@@ -23,7 +23,9 @@ class SimActor:
         for action in step.do:
             kind, args = action[0], action[1:]
             if kind == "reset_ecu":
-                self.sim = Sim(brake=self.brake).boot()
+                # the keypad stays powered: keys physically held survive the ECU reset
+                held = self.sim.physical_held if self.sim else []
+                self.sim = Sim(brake=self.brake, held=held).boot()
             elif kind == "hold":
                 self.sim.hold(*args)
             elif kind == "release":

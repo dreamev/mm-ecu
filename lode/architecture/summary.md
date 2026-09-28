@@ -40,7 +40,8 @@ sequenceDiagram
   App->>Bus: state (log on change)
   App->>Bus: receive() (≤0.1 s timeout)
   App->>App: dispatch by CAN id (heartbeat / key state / HV bus)
-  App->>App: start keypad if first tick, boot-up or pre-operational
+  App->>App: start keypad if first tick, boot-up, stopped or pre-operational (NMT + SDO key-level read)
+  App->>App: key baseline timeout (1 s) if the SDO reply never came
   App->>App: if LEDs dirty → queue one full LED frame
   App->>Bus: send ≤1 queued frame
 ```

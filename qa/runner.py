@@ -80,6 +80,8 @@ class Runner:
         events, errors = [], self._errors_between_steps
         self._errors_between_steps = []
         self.ui.say(step.instruction)
+        if step.ready:
+            self.ui.ask(step.ready, {"yes": "ready"})
         self.actor.perform(step)
         waiting_for = [check for check in step.expect if not check.final]
         deadline = self.clock() + step.timeout

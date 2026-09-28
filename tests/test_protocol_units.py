@@ -92,6 +92,7 @@ def test_heartbeat_states(data, state):
 
 def test_key_edges_report_presses_and_releases():
     pad = keypad.Keypad()
+    pad.set_baseline([], "test")
     assert pad.key_edges([Key.DRIVE]) == ([Key.DRIVE], [])
     assert pad.key_edges([Key.DRIVE]) == ([], [])
     assert pad.key_edges([Key.DRIVE, Key.F1]) == ([Key.F1], [])
@@ -100,9 +101,19 @@ def test_key_edges_report_presses_and_releases():
     assert pad.key_edges([Key.DRIVE]) == ([Key.DRIVE], [])
 
 
-def test_restart_forgets_held_keys():
+def test_no_edges_until_the_baseline_is_known():
     pad = keypad.Keypad()
-    pad.key_edges([Key.HAZARD])
+    assert pad.key_edges([Key.HAZARD]) == ([], [])
+    pad.set_baseline([Key.HAZARD], "test")
+    assert pad.key_edges([Key.HAZARD, Key.F1]) == ([Key.F1], [])
+
+
+def test_restart_requires_a_new_baseline():
+    pad = keypad.Keypad()
+    pad.set_baseline([], "test")
     pad.mark_started()
     assert pad.state == keypad.NodeState.OPERATIONAL
+    assert pad.key_edges([Key.HAZARD]) == ([], [])  # may have been held since before the restart
+    pad.set_baseline([Key.HAZARD], "test")
+    assert pad.key_edges([]) == ([], [Key.HAZARD])
     assert pad.key_edges([Key.HAZARD]) == ([Key.HAZARD], [])

@@ -8,6 +8,7 @@
 - Heartbeat - periodic keypad frame on `0x715` reporting its node state (off by default on the PKP).
 - Stopped - CANopen node state `04`; the pad sends nothing until restarted.
 - Key edges - presses (down now, not before) and releases (down before, not now) between key-state frames.
+- Key baseline - keys already down when the keypad (re)starts, read via SDO 2000h; they count as held, never as presses.
 - Hold keys - cruise speed ±: lit while held, act on release with the held seconds.
 - VehicleActions - `mmecu/actions.py`; log-only stubs for vehicle effects not yet wired (regen, cruise, power mode, hazard, exhaust).
 - Stub - a VehicleActions method that only logs `TODO ...`; its key handling and LEDs are live.

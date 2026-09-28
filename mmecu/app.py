@@ -4,14 +4,18 @@ from mmecu import battery, keypad, log
 from mmecu.can import Outbox
 from mmecu.drivetrain import DriveState
 
-LISTEN_IDS = (battery.HV_BUS_STATUS_ID, keypad.HEARTBEAT_ID, keypad.KEY_STATE_ID)
+LISTEN_IDS = (battery.HV_BUS_STATUS_ID, keypad.HEARTBEAT_ID, keypad.KEY_STATE_ID, keypad.SDO_RESPONSE_ID)
+# How long to wait for the keypad's SDO key-state reply before trusting key frames alone
+BASELINE_TIMEOUT_SECONDS = 1.0
 
 
 class Application:
     """One `tick()` per main-loop iteration: receive at most one frame, send at most one."""
 
-    def __init__(self, bus, pad, controller, gauge):
+    def __init__(self, bus, pad, controller, gauge, clock):
         self.bus = bus
+        self.clock = clock
+        self._baseline_deadline = None
         self.pad = pad
         self.controller = controller
         self.gauge = gauge
@@ -21,6 +25,7 @@ class Application:
         self._handlers = {
             keypad.HEARTBEAT_ID: self._on_heartbeat,
             keypad.KEY_STATE_ID: self._on_key_state,
+            keypad.SDO_RESPONSE_ID: self._on_sdo_response,
             battery.HV_BUS_STATUS_ID: self._on_hv_bus_status,
         }
 
@@ -30,6 +35,7 @@ class Application:
         if message is not None:
             self._dispatch(message)
         self._ensure_pad_started()
+        self._check_baseline_timeout()
         if self.pad.leds_dirty:
             payload = self.pad.led_payload()
             self.outbox.push(keypad.LED_ID, payload)
@@ -64,9 +70,21 @@ class Application:
             )
         log.event("keypad_start", reason=self.pad.state)
         self.outbox.push(keypad.NMT_ID, keypad.NMT_START_ALL_NODES)
+        self.outbox.push(keypad.SDO_REQUEST_ID, keypad.SDO_READ_KEY_STATE)
+        self._baseline_deadline = self.clock() + BASELINE_TIMEOUT_SECONDS
         self.pad.mark_started()
         self.controller.keypad_restarted()
         self._pad_started = True
+
+    def _check_baseline_timeout(self):
+        if self.pad.baseline_pending and self._baseline_deadline is not None and self.clock() > self._baseline_deadline:
+            log.warning("keypad did not answer the key-state SDO read; using the last key frame as baseline")
+            self.pad.set_baseline(self.pad.held, "timeout")
+
+    def _on_sdo_response(self, data):
+        held = keypad.decode_key_state_reply(data)
+        if held is not None and self.pad.baseline_pending:
+            self.pad.set_baseline(held, "sdo")
 
     def _on_heartbeat(self, data):
         self.pad.on_heartbeat(data)

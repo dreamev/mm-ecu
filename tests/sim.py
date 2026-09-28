@@ -21,6 +21,9 @@ NMT_ID = 0x000
 HEARTBEAT_ID = 0x715
 KEY_STATE_ID = 0x195
 LED_ID = 0x215
+SDO_REQUEST_ID = 0x615
+SDO_RESPONSE_ID = 0x595
+SDO_READ_KEY_STATE = [0x40, 0x00, 0x20, 0x01]  # manual §15: read object 2000h sub 1
 HV_BUS_ID = 0x126
 
 HEARTBEAT = {"boot_up": 0x00, "stopped": 0x04, "pre_operational": 0x7F, "operational": 0x05}
@@ -71,9 +74,17 @@ def _build_app(clock, actions):
 
 
 class Sim:
-    """`brake` is the sensor reading at boot: engaged, disengaged, invalid or both."""
+    """`brake` is the sensor reading at boot: engaged, disengaged, invalid or both.
 
-    def __init__(self, brake="engaged"):
+    The simulated keypad tracks which keys are physically `held` (they stay held
+    across an ECU reset) and answers SDO key-state reads unless `sdo_replies=False`
+    (a pad firmware without that object).
+    """
+
+    def __init__(self, brake="engaged", held=(), sdo_replies=True):
+        self.physical_held = list(held)
+        self.sdo_replies = sdo_replies
+        self._sdo_seen = 0
         levels = {
             "engaged": (True, False),
             "disengaged": (False, True),
@@ -93,6 +104,15 @@ class Sim:
     def tick(self, count=1):
         for _ in range(count):
             self.app.tick()
+            self._answer_sdo_reads()
+
+    def _answer_sdo_reads(self):
+        requests = self.sent(SDO_REQUEST_ID)
+        for _, data in requests[self._sdo_seen :]:
+            if self.sdo_replies and data[:4] == SDO_READ_KEY_STATE:
+                levels = key_state_payload(*self.physical_held)
+                self.receive(SDO_RESPONSE_ID, [0x4B, 0x00, 0x20, 0x01] + levels + [0, 0])
+        self._sdo_seen = len(requests)
 
     def settle(self, max_ticks=100):
         """Tick until the ECU has nothing left to send."""
@@ -114,6 +134,7 @@ class Sim:
 
     def hold(self, *names):
         """Send the key-state frame for exactly these keys being down (manual §10: level, not events)."""
+        self.physical_held = list(names)
         self.receive(KEY_STATE_ID, key_state_payload(*names))
         self.settle()
 
@@ -126,6 +147,7 @@ class Sim:
         self.clock.now += seconds
 
     def release(self):
+        self.physical_held = []
         self.receive(KEY_STATE_ID, [0, 0])
         self.settle()
 

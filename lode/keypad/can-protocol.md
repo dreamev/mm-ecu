@@ -9,6 +9,7 @@ are padded/truncated to 8 data bytes.
 | Heartbeat | `0x715` (0x700+node) | pad → ECU | `00` boot-up, `04` stopped, `7F` pre-operational, `05` operational |
 | Key state (TPDO1) | `0x195` (0x180+node) | pad → ECU | bytes 0–1: little-endian bitmask, bit `n-1` = key `n` pressed |
 | LED colors (RPDO1) | `0x215` (0x200+node) | ECU → pad | 36-bit little-endian bitfield (below) |
+| Key levels (SDO read 2000h/1) | `0x615` → `0x595` | ECU ↔ pad | `40 00 20 01` → `4B 00 20 01 <b0> <b1>` (same bitmask) |
 
 ## Key-state bitmask
 ```python
@@ -17,8 +18,33 @@ pressed = [n for n in range(1, 13) if mask >> (n - 1) & 1]
 ```
 The pad reports the *level* of every key on every press or release. `Keypad.key_edges`
 compares with the previous frame and returns `(pressed, released)`, so a repeated frame
-or a second key going down never re-triggers a held key. The held set clears on every
-NMT start (`Keypad.mark_started`).
+or a second key going down never re-triggers a held key.
+
+### Key baseline after every keypad start
+A level frame cannot tell "just pressed" from "held since before a restart". Holding
+DRIVE through an ECU reset or keypad reboot and then touching any key used to release
+the brake and pulse the drive relay (found by Copilot review, reproduced in the sim).
+- Every NMT start also queues an SDO read of the key levels (`0x615: 40 00 20 01`).
+- Until the reply (`0x595`) arrives, `baseline_pending` is set, and key frames only
+  update the held set and dispatch nothing. The reply becomes the baseline: those keys
+  are held and fire only after being released and pressed again.
+- If there is no reply within `BASELINE_TIMEOUT_SECONDS` (1 s), the last key frame
+  becomes the baseline and a warning is logged. Event: `keypad_baseline source=sdo|timeout keys=…`.
+- Cost: a press within about 0.3 s of a keypad start is not acted on.
+
+```mermaid
+sequenceDiagram
+  participant ECU
+  participant Pad
+  ECU->>Pad: 000: 01 00 (start)
+  ECU->>Pad: 615: 40 00 20 01 (read key levels)
+  Pad-->>ECU: 195: 10 00 (DRIVE down, held since before the reset)
+  Note over ECU: baseline pending: no action
+  Pad-->>ECU: 595: 4B 00 20 01 10 00
+  Note over ECU: baseline = {DRIVE}
+  Pad-->>ECU: 195: 90 00 (DRIVE + F1)
+  Note over ECU: only F1 fires
+```
 
 ## LED bitfield
 Red occupies bits 0–11, green 12–23, blue 24–35; within a channel bit `n-1` is key `n`.

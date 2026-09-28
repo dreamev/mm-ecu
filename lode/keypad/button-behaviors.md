@@ -31,6 +31,8 @@ dark LED. "Vehicle must be stopped" is not enforced (no speed source).
 ## Dispatch contract
 - `Keypad.key_edges(held)` compares with the previous key-state frame and returns
   `(pressed, released)`. Frames are level snapshots, so held keys never re-trigger.
+- After every keypad start, nothing fires until the key baseline is known (SDO read, see
+  [can-protocol.md](can-protocol.md)). Keys down at that moment count as held.
 - `Application` dispatches releases first, then presses, each in key order 1→12.
 - `VehicleController.key_pressed` records a `clock()` timestamp. `key_released` calls
   the key's release handler (if any) with `held_seconds`.

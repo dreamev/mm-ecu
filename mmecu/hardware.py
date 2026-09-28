@@ -91,4 +91,4 @@ def build_application(sleep=time.sleep, clock=time.monotonic, actions=None):
     )
     controller = VehicleController(pad, shifter, parking_brake, actions or VehicleActions(), clock)
     gauge = BatteryGauge(build_gauge_servo())
-    return Application(CanBus(LISTEN_IDS), pad, controller, gauge)
+    return Application(CanBus(LISTEN_IDS), pad, controller, gauge, clock)

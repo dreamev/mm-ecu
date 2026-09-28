@@ -11,6 +11,11 @@ NMT_START_ALL_NODES = (0x01, 0x00)
 HEARTBEAT_ID = 0x700 + NODE_ID
 KEY_STATE_ID = 0x180 + NODE_ID
 LED_ID = 0x200 + NODE_ID
+SDO_REQUEST_ID = 0x600 + NODE_ID
+SDO_RESPONSE_ID = 0x580 + NODE_ID
+# Manual §15: read object 2000h sub 1 (current key levels). Reply: 4B 00 20 01 <b0> <b1>
+SDO_READ_KEY_STATE = (0x40, 0x00, 0x20, 0x01)
+SDO_UPLOAD_REPLIES = (0x43, 0x47, 0x4B)  # expedited upload response, 4/3/2 data bytes
 
 KEY_COUNT = 12
 LED_PAYLOAD_LENGTH = 5
@@ -72,6 +77,13 @@ def decode_pressed_keys(data):
     return [key for key in Key.ALL if mask >> (key - 1) & 1]
 
 
+def decode_key_state_reply(data):
+    """Held keys from an SDO reply to SDO_READ_KEY_STATE; None for any other SDO frame."""
+    if len(data) < 6 or data[0] not in SDO_UPLOAD_REPLIES or tuple(data[1:4]) != SDO_READ_KEY_STATE[1:]:
+        return None
+    return decode_pressed_keys(data[4:6])
+
+
 def encode_leds(colors):
     """Pack 12 (r, g, b) tuples, indexed by key - 1, into the LED payload.
 
@@ -93,6 +105,9 @@ class Keypad:
         self.state = NodeState.UNKNOWN
         self._colors = [Color.BLACK] * KEY_COUNT
         self._held = []
+        # Until the baseline is known, a key reported down may have been held since
+        # before a restart, so key frames only update _held and trigger nothing.
+        self.baseline_pending = True
         self.leds_dirty = False
 
     def color(self, key):
@@ -107,22 +122,36 @@ class Keypad:
         self.leds_dirty = False
         return encode_leds(self._colors)
 
+    @property
+    def held(self):
+        return self._held
+
     def key_edges(self, held):
         """(pressed, released) keys relative to the previous key-state frame.
 
         Key-state frames carry the level of every key and are sent on any change
         (and periodically if object 1800h is configured), so presses and releases
-        are the edges between consecutive frames.
+        are the edges between consecutive frames. While the baseline is pending no
+        edges are reported.
         """
+        if self.baseline_pending:
+            self._held = held
+            return [], []
         pressed = [key for key in held if key not in self._held]
         released = [key for key in self._held if key not in held]
         self._held = held
         return pressed, released
 
     def mark_started(self):
-        """We sent NMT start: the pad is Operational with nothing known to be held."""
+        """We sent NMT start: Operational, but which keys are down is unknown until set_baseline."""
         self.state = NodeState.OPERATIONAL
-        self._held = []
+        self.baseline_pending = True
+
+    def set_baseline(self, held, source):
+        """Keys down right now are held, not pressed: they cannot fire until released and pressed."""
+        self._held = held
+        self.baseline_pending = False
+        log.event("keypad_baseline", source=source, keys=",".join(str(key) for key in held) or "none")
 
     def needs_start(self):
         return self.state in (NodeState.BOOT_UP, NodeState.STOPPED, NodeState.PRE_OPERATIONAL)

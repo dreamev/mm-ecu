@@ -153,8 +153,9 @@ def update_context(ctx, event):
 
 # --- the script ---------------------------------------------------------------
 class Step:
-    def __init__(self, id, group, instruction, do, expect, confirm=None, timeout=20, optional=False):
+    def __init__(self, id, group, instruction, do, expect, confirm=None, timeout=20, optional=False, ready=None):
         self.id = id
+        self.ready = ready  # asked before `do` runs, e.g. "Holding HAZARD?" before an automated reset
         self.group = group
         self.instruction = instruction
         self.do = do
@@ -164,7 +165,7 @@ class Step:
         self.optional = optional  # a timeout means "not testable here" (SKIP), not FAIL
 
 
-def _drive_step(key, relay, brake):
+def _drive_step(key, relay, brake, id=None):
     expect = [Saw("key_down", key=KEY_NUMBER[key]), Leds(only_drive_lit(key)), State(drive=key)]
     expect.append(Count(1, "relay", state=key) if relay else Count(0, "relay"))
     if brake is not None:
@@ -177,7 +178,7 @@ def _drive_step(key, relay, brake):
     if brake == 1:
         checks.append("the parking brake is engaged")
     return Step(
-        f"drive-{key.lower()}",
+        id or f"drive-{key.lower()}",
         "drive",
         f"Tap {key}.",
         tap(key),
@@ -227,7 +228,7 @@ STEPS = (
             "startup",
             "Resetting the ECU over USB. Leave the keypad powered.",
             [reset_ecu()],
-            [Saw("ecu_start"), Saw("keypad_start"), Leds(current_drive_lit)],
+            [Saw("ecu_start"), Saw("keypad_start"), Saw("keypad_baseline", source="sdo"), Leds(current_drive_lit)],
             confirm="Confirm: the keypad shows only {drive} lit blue among P/R/N/D (brake engaged={brake}).",
             timeout=15,
         ),
@@ -274,7 +275,26 @@ STEPS = (
             confirm="Confirm: the DRIVE relay clicked only once.",
             timeout=30,
         ),
-        _drive_step("PARK", relay=False, brake=1),
+        _drive_step("PARK", relay=False, brake=1, id="drive-park-again"),
+        Step(
+            "held-through-reset",
+            "edges",
+            "Press and HOLD HAZARD, and keep holding it. The harness will then reset the ECU.",
+            [hold("HAZARD"), reset_ecu()],
+            [Saw("ecu_start"), Saw("keypad_baseline", source="sdo", keys=KEY_NUMBER["HAZARD"])],
+            ready="Are you holding HAZARD down now?",
+            timeout=15,
+        ),
+        Step(
+            "held-key-ignored-after-reset",
+            "edges",
+            "Still holding HAZARD, tap F2. Then release HAZARD.",
+            [hold("HAZARD", "F2"), hold("HAZARD"), release()],
+            # HAZARD is in the baseline, so it was never "pressed" and emits no key_up either
+            [Saw("power_mode", mode="high"), Count(0, "hazard")],
+            confirm="Confirm: HAZARD stayed dark the whole time (a key held through a reset must not fire).",
+            timeout=30,
+        ),
         Step(
             "keypad-reboot",
             "keypad",
@@ -296,8 +316,6 @@ STEPS = (
         ),
     ]
 )
-# The PARK step appears twice (before and after the edge test); keep ids unique.
-STEPS[-3].id = "drive-park-again"
 
 GROUPS = []
 for _step in STEPS:
