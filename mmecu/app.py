@@ -78,8 +78,9 @@ class Application:
 
     def _check_baseline_timeout(self):
         if self.pad.baseline_pending and self._baseline_deadline is not None and self.clock() > self._baseline_deadline:
-            log.warning("keypad did not answer the key-state SDO read; using the last key frame as baseline")
-            self.pad.set_baseline(self.pad.held, "timeout")
+            log.warning("keypad did not answer the key-state SDO read; baseline from key frames instead")
+            self._baseline_deadline = None
+            self.pad.baseline_timed_out()
 
     def _on_sdo_response(self, data):
         held = keypad.decode_key_state_reply(data)

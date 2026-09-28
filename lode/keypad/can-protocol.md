@@ -28,8 +28,13 @@ the brake and pulse the drive relay (found by Copilot review, reproduced in the 
 - Until the reply (`0x595`) arrives, `baseline_pending` is set, and key frames only
   update the held set and dispatch nothing. The reply becomes the baseline: those keys
   are held and fire only after being released and pressed again.
-- If there is no reply within `BASELINE_TIMEOUT_SECONDS` (1 s), the last key frame
-  becomes the baseline and a warning is logged. Event: `keypad_baseline source=sdo|timeout keys=…`.
+- If there is no reply within `BASELINE_TIMEOUT_SECONDS` (1 s), a warning is logged, and:
+  - if a key frame arrived since the start, that frame becomes the baseline (`source=timeout`);
+  - otherwise the **next** key frame becomes the baseline and triggers nothing
+    (`source=first_frame`). "No frame seen" is never taken as "no keys held"; that
+    assumption let a held DRIVE fire (second Copilot review).
+  A late SDO reply still wins while the baseline is pending.
+  Event: `keypad_baseline source=sdo|timeout|first_frame keys=…`.
 - Cost: a press within about 0.3 s of a keypad start is not acted on.
 
 ```mermaid

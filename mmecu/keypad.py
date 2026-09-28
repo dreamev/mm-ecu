@@ -108,6 +108,8 @@ class Keypad:
         # Until the baseline is known, a key reported down may have been held since
         # before a restart, so key frames only update _held and trigger nothing.
         self.baseline_pending = True
+        self._frame_since_start = False
+        self._baseline_from_next_frame = False
         self.leds_dirty = False
 
     def color(self, key):
@@ -136,6 +138,9 @@ class Keypad:
         """
         if self.baseline_pending:
             self._held = held
+            self._frame_since_start = True
+            if self._baseline_from_next_frame:
+                self.set_baseline(held, "first_frame")
             return [], []
         pressed = [key for key in held if key not in self._held]
         released = [key for key in self._held if key not in held]
@@ -146,11 +151,25 @@ class Keypad:
         """We sent NMT start: Operational, but which keys are down is unknown until set_baseline."""
         self.state = NodeState.OPERATIONAL
         self.baseline_pending = True
+        self._frame_since_start = False
+        self._baseline_from_next_frame = False
+
+    def baseline_timed_out(self):
+        """No SDO reply. Use the last key frame since the start; with none, wait for the next.
+
+        An empty held set must never be assumed: a key held through the restart would
+        then fire on the next change.
+        """
+        if self._frame_since_start:
+            self.set_baseline(self._held, "timeout")
+        else:
+            self._baseline_from_next_frame = True
 
     def set_baseline(self, held, source):
         """Keys down right now are held, not pressed: they cannot fire until released and pressed."""
         self._held = held
         self.baseline_pending = False
+        self._baseline_from_next_frame = False
         log.event("keypad_baseline", source=source, keys=",".join(str(key) for key in held) or "none")
 
     def needs_start(self):

@@ -31,7 +31,7 @@ always on (human-rate) and go to `print` by default. Tests capture them with
 | `ecu_start` | `drive`, `brake` (0/1) | app, first keypad start |
 | `keypad_start` | `reason` (node state before start) | app, every NMT start |
 | `keypad_state` | `state` | keypad heartbeat change |
-| `keypad_baseline` | `source` (sdo/timeout), `keys` (e.g. `1,9` or `none`) | keypad, when the post-start key baseline is set |
+| `keypad_baseline` | `source` (sdo/timeout/first_frame), `keys` (e.g. `1,9` or `none`) | keypad, when the post-start key baseline is set |
 | `leds` | `payload` (5-byte hex) | app, every LED frame queued |
 | `key_down` / `key_up` | `key` (1–12), `held` (s, key_up) | controller |
 | `drive` | `state` | controller, on drive-state change |

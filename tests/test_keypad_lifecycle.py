@@ -136,3 +136,25 @@ def test_without_an_sdo_reply_keys_are_ignored_until_the_timeout_then_work():
     sim.hold("DRIVE", "F1", "F2")  # after the timeout, F2 is a new press; DRIVE stays held
     assert sim.pulses() == []
     assert sim.lit()["F2"] == "yellow"
+
+
+def test_sdo_timeout_without_any_key_frame_makes_the_next_frame_the_baseline():
+    # Copilot review r4126474633: "no frame seen" must not be taken as "no keys held".
+    sim = Sim(brake="engaged", held=["DRIVE"], sdo_replies=False).boot()
+    sim.wait(1.5)
+    sim.tick()
+    sim.hold("DRIVE", "F1")  # first frame after the timeout: baseline only
+    assert sim.pulses() == []
+    assert sim.brake_outputs() == {"engage": True, "disengage": False}
+    assert sim.events("keypad_baseline")[-1].fields == {"source": "first_frame", "keys": "5,8"}
+    sim.hold("DRIVE", "F1", "F2")  # later changes are normal presses
+    assert sim.pulses() == []
+    assert sim.lit()["F2"] == "yellow"
+
+
+def test_sdo_timeout_after_a_key_frame_uses_that_frame():
+    sim = Sim(brake="engaged", held=["DRIVE"], sdo_replies=False).boot()
+    sim.hold("DRIVE")  # a frame arrives inside the window
+    sim.wait(1.5)
+    sim.tick()
+    assert sim.events("keypad_baseline")[-1].fields == {"source": "timeout", "keys": "5"}
