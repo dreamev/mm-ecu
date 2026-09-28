@@ -132,10 +132,24 @@ class Runner:
                 self.ui.say(f"  {line.strip()}", "console")
 
 
-def report_markdown(results, started_at):
+def run_outcome(results, steps):
+    """PASS only if every selected step ran and none failed; a partial run is INCOMPLETE."""
+    if len(results) < len(steps):
+        return "INCOMPLETE"
+    return FAIL if any(result.status == FAIL for result in results) else PASS
+
+
+def report_markdown(results, started_at, steps=None):
     counts = {status: sum(r.status == status for r in results) for status in (PASS, FAIL, SKIP)}
+    if steps is None:
+        steps = [result.step for result in results]
+    outcome = run_outcome(results, steps)
+    if outcome == "INCOMPLETE":
+        outcome = f"INCOMPLETE: {len(results)} of {len(steps)} steps run"
     lines = [
         f"# mm-ecu hardware QA {started_at}",
+        "",
+        f"**Result: {outcome}**",
         "",
         f"PASS {counts[PASS]} / FAIL {counts[FAIL]} / SKIP {counts[SKIP]}",
         "",

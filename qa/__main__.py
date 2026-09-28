@@ -6,7 +6,7 @@ import os
 import sys
 
 from qa.console import SerialConsole, TerminalUI, find_port
-from qa.runner import FAIL, HardwareActor, Runner, report_markdown
+from qa.runner import PASS, HardwareActor, Runner, report_markdown, run_outcome
 from qa.steps import GROUPS, STEPS
 
 REPORT_DIR = "qa-reports"
@@ -52,10 +52,10 @@ def main(argv=None):
     os.makedirs(REPORT_DIR, exist_ok=True)
     path = os.path.join(REPORT_DIR, "qa-" + started_at.replace(":", "").replace(" ", "-") + ".md")
     with open(path, "w") as report:
-        report.write(report_markdown(runner.results, started_at))
-    failed = [result for result in runner.results if result.status == FAIL]
-    print(f"\n{len(runner.results)} steps run, {len(failed)} failed. Report: {path}")
-    return 1 if failed else 0
+        report.write(report_markdown(runner.results, started_at, steps))
+    outcome = run_outcome(runner.results, steps)
+    print(f"\n{outcome}: {len(runner.results)} of {len(steps)} steps run. Report: {path}")
+    return 0 if outcome == PASS else 1
 
 
 if __name__ == "__main__":

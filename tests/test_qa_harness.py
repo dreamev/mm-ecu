@@ -182,3 +182,59 @@ def test_retrying_a_toggle_step_after_a_rejected_confirmation_does_not_toggle_ba
     assert actor.sim.lit()[key] == color
     assert len(actor.sim.events(step.target and next(iter(step.target)))) == 1  # toggled exactly once
     assert any("already" in line for line in ui.said)
+
+
+# --- exit status of `python -m qa` (Copilot review: aborted runs must not look like passes) ---
+class _NullConsole:
+    def __init__(self, port):
+        pass
+
+    def read_lines(self, timeout):
+        return []
+
+    def reset_board(self):
+        pass
+
+    def close(self):
+        pass
+
+
+def _run_main(monkeypatch, tmp_path, ui, run=None):
+    import qa.__main__ as cli
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "SerialConsole", _NullConsole)
+    monkeypatch.setattr(cli, "TerminalUI", lambda verbose: ui)
+    if run is not None:
+        monkeypatch.setattr(cli.Runner, "run", run)
+    code = cli.main(["--port", "/dev/fake"])
+    (report,) = (tmp_path / "qa-reports").iterdir()
+    return code, report.read_text()
+
+
+def test_declining_the_safety_gate_exits_nonzero(monkeypatch, tmp_path):
+    code, report = _run_main(monkeypatch, tmp_path, AutoUI({"Is the vehicle safe": "no"}))
+    assert code == 1
+    assert "INCOMPLETE" in report
+
+
+def test_interrupted_run_with_only_passes_exits_nonzero(monkeypatch, tmp_path):
+    from qa.runner import Result
+
+    def run(self, steps):
+        self.results.append(Result(steps[0], PASS, ""))
+        raise KeyboardInterrupt
+
+    code, report = _run_main(monkeypatch, tmp_path, AutoUI(), run)
+    assert code == 1
+    assert f"INCOMPLETE: 1 of {len(STEPS)} steps run" in report
+
+
+def test_complete_run_outcomes():
+    from qa.runner import Result, run_outcome
+
+    steps = STEPS[:2]
+    assert run_outcome([Result(s, PASS, "") for s in steps], steps) == "PASS"
+    assert run_outcome([Result(steps[0], PASS, ""), Result(steps[1], SKIP, "")], steps) == "PASS"
+    assert run_outcome([Result(steps[0], PASS, ""), Result(steps[1], FAIL, "")], steps) == "FAIL"
+    assert run_outcome([Result(steps[0], PASS, "")], steps) == "INCOMPLETE"

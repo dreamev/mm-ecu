@@ -4,7 +4,10 @@
 vehicle I/O. It soft-resets the board over USB serial, tells the tester what to
 press or hold, checks the firmware's structured events, asks the tester to confirm
 what only a human can see (LED colors, relay clicks, brake, gauge), and writes a
-report to `qa-reports/qa-<timestamp>.md` (git-ignored). The exit code is 1 if any step failed.
+report to `qa-reports/qa-<timestamp>.md` (git-ignored). The run's result is **PASS** only if
+every selected step ran and none failed (SKIPs are fine). An aborted safety gate, Ctrl-C or
+"quit" makes it **INCOMPLETE**. Anything but PASS exits non-zero and is shown at the top of
+the report, so a partial bench session can never look like a release check.
 
 ```mermaid
 sequenceDiagram
