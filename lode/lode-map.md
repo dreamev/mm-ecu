@@ -21,5 +21,5 @@
 - testing/
   - [summary.md](testing/summary.md) — test layers, Sim API, fakes contract, the code.py/stdlib shadowing lesson
 - plans/
-  - [roadmap.md](plans/roadmap.md) — open questions for the human, unimplemented requirements, follow-ups
+  - [roadmap.md](plans/roadmap.md) — open questions for the human, bench-verification checklist, unimplemented requirements, follow-ups
 - tmp/ — git-ignored session scraps

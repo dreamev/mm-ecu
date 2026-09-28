@@ -8,6 +8,21 @@
 3. **Exception policy**: an unexpected exception still halts `code.py`. Options: a
    catch-all in `code.py` that logs and continues, or `supervisor.reload()`.
    This needs a safety decision.
+4. **NMT start scope**: the ECU sends `01 00` (start *all* CANopen nodes). The manual
+   also allows `01 15` (keypad only). Both work today; addressing only the keypad avoids
+   starting any CANopen device added to the bus later.
+5. **Exhaust LED color**: the requirement says solid "(white?)"; the implementation uses
+   yellow (as does hazard). REGEN already uses white.
+
+## Needs bench verification (not provable in the simulator)
+- Firmware fits in RAM with the multi-module `mmecu/` layout (fallback: `mpy-cross`).
+- Boot drive state: with the brake released the ECU *displays* NEUTRAL but cannot read
+  the drive unit's actual gear, and pulses no relay. Confirm this is the right display.
+- Keypad behavior vs the manual (rev 1.1 is marked "for reference only"): edge-based
+  key frames, the Stopped heartbeat, and, before using the blink PDO, what "alternate
+  mode" does when blink is sent to an LED that is already ON.
+- Stub keys (REGEN, cruise) light their LEDs although nothing reaches the vehicle yet
+  (decided by the human; see ../keypad/button-behaviors.md). Make sure drivers/testers know.
 
 ## Not yet implemented (from REQUIREMENTS.md)
 Every key is handled; these effects are log-only stubs in `mmecu/actions.py`
