@@ -13,10 +13,10 @@
    starting any CANopen device added to the bus later.
 5. **Exhaust LED color**: the requirement says solid "(white?)"; the implementation uses
    yellow (as does hazard). REGEN already uses white.
-6. **What controls the drive unit?** Stock Tesla logic board, an openinverter board, or
-   another VCU? This determines whether CAN shifting is possible and how (see
-   ../vehicle/drive-unit-can.md). For openinverter, its `dirmode` also explains how the
-   0.5 s relay pulses are interpreted.
+6. **Which purchased ECU controls the drive unit?** Confirmed: a purchased third-party ECU,
+   reached through the custom interface PCB (v32). The model isn't recorded anywhere in the
+   repo. Its manual would say whether and how it accepts R/N/D over CAN, and how it reads
+   the 0.5 s input pulses (see ../vehicle/drive-unit-can.md).
 
 ## Needs bench verification (not provable in the simulator)
 `make qa` covers the keypad, relays, brake, toggles, holds, keypad reboot and gauge

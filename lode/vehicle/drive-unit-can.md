@@ -5,6 +5,27 @@ Commanding the drive unit over CAN was tried from Nov 2023 to Jan 2024 and aband
 June 2024. This file records what is known (from git history and public sources) so the
 idea can be revisited without repeating the investigation.
 
+## The drive-unit controller (from history; model not recorded)
+The human confirmed (2026-09-28) that a **purchased third-party ECU** controls the drive unit.
+Git history, PR descriptions and deleted files never name the product. What they do record:
+- It is called the "Tesla ECU" / "Tesla drive controller" (PR #6, `83c7f12` module docstring).
+- The Feather reaches it through a **custom interface PCB** ("v32 of the custom PCB designed to
+  interface with the controller", PR #7, 2024-06). R/N/D are **0.5 s pulses on three inputs**
+  (added in `86d6d96`, 2024-06; the 2021–22 code only changed LED colors).
+- The bus carries `0x126` in **Tesla's own DI_hvBusStatus format** (DBC `BO_ 294`; real
+  values confirmed in PR #8). `DI_*` is Tesla's drive-inverter message family. An openinverter
+  replacement board sends its own CAN map instead, so the drive unit most likely runs **stock
+  Tesla firmware**, with the purchased ECU emulating the car to it. This is an inference: the ECU
+  could also re-broadcast `0x126`.
+
+```mermaid
+flowchart LR
+  Pad[Keypad] <-->|CAN 500k| Feather[mm-ecu Feather]
+  Feather -->|D11-D13 pulses| PCB[custom interface PCB v32] --> ECU[purchased Tesla ECU]
+  ECU <-->|CAN| DI[Tesla drive unit, likely stock firmware]
+  DI -->|0x126 DI_hvBusStatus, 500k| Feather
+```
+
 ## Bus speed: a mismatch is very unlikely to be the cause
 - Tesla's vehicle CAN networks, including the powertrain CAN, run at **500 kbit/s**
   (Instructables "Exploring the Tesla Model S CAN Bus"; TMC powertrain CAN thread).
@@ -37,11 +58,14 @@ timeline
 ## More likely causes (ranked; unverified without the drive-unit controller's config)
 1. **The Nov 2023 version could not transmit at all** (TypeError above). Anything tested
    against it failed regardless of bus or receiver.
-2. **Protocol, not speed.** `0x697` with `0D/0E/0F BE EF` matches no message we know of
-   for either receiver type (the `BE EF` looks like a hand-picked marker):
+2. **Protocol, not speed.** A CAN shift command has to be in whatever format the *purchased
+   ECU* accepts (if it accepts any; many such controllers take gear on digital inputs).
+   `0x697` with `0D/0E/0F BE EF` matches no known message, and the `BE EF` looks like a
+   hand-picked placeholder rather than a vendor spec. For comparison:
    - *Stock Tesla drive-inverter firmware* is commonly reported to depend on the car's
      full message set (gateway/vehicle state), not a single command frame. Unverified here.
-   - *openinverter board* (the common conversion controller; "can be controlled via CAN or
+   - *openinverter board* (a common conversion controller, but unlikely here because of the
+     Tesla-format `0x126`; kept as an example of typical CAN-control rules; "can be controlled via CAN or
      via digital and analog inputs"): CAN control is read only from the configured
      `controlid` (default **63 = 0x03F**). The 8-byte frame is laid out as:
      - `pot` in bits 0–11, `pot2` in 12–23, `canio` in 24–29 (`8=Fwd, 16=Rev`), and a
@@ -60,8 +84,9 @@ Note: in openinverter, CAN `Fwd`/`Rev` are ORed with the digital inputs (`din_fo
 depends on `dirmode` (Button versus Switch).
 
 ## If CAN shifting is revisited
-- First establish what controls the drive unit (open question in
-  [../plans/roadmap.md](../plans/roadmap.md)) and read its CAN configuration.
+- Get the purchased ECU's product name and manual (open question in
+  [../plans/roadmap.md](../plans/roadmap.md)). The CAN command format, whether commands must
+  repeat, and any counter/checksum rules come from there, not from Tesla's DBC.
 - For openinverter: send the control frame on `controlid` **periodically** (well under
   500 ms), with incrementing counters and the CRC, and hold Fwd/Rev as levels. Keep
   the blocking relay-pulse invariant's intent: never request two directions at once.
