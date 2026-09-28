@@ -11,6 +11,7 @@ code.py          entrypoint CircuitPython runs at boot (boot + main loop only)
 mmecu/           firmware logic; only mmecu/hardware.py touches pins/CAN
 lib/             vendored CircuitPython libraries (adafruit_motor)
 tests/           pytest suite running the firmware against fake hardware
+tools/           host-side deploy/restore tool (python3 stdlib only)
 qa/              host-side hardware QA harness (make qa); not deployed
 lode/            project knowledge base (protocols, wiring, design notes)
 ```
@@ -19,7 +20,8 @@ lode/            project knowledge base (protocols, wiring, design notes)
 ```
 make test        # full suite on CPython, no board needed (~0.1 s)
 make lint        # ruff
-make deploy      # test + copy firmware to the mounted CIRCUITPY drive
+make deploy      # test + copy firmware to the mounted CIRCUITPY drive (verified)
+make restore     # put the known-good firmware back: deploys git master (REF=... for another)
 make watch       # redeploy on every save (needs fswatch)
 make console     # serial console, 115200 baud (PORT=/dev/... to override)
 make qa          # guided hardware QA: press what it says, it checks the firmware's events

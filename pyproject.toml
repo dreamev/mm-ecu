@@ -17,4 +17,4 @@ select = ["E", "F", "W", "I", "B", "SIM", "C4", "RET", "PIE"]
 
 [tool.ruff.lint.isort]
 known-third-party = ["board", "canio", "digitalio", "pwmio", "adafruit_motor"]
-known-first-party = ["mmecu", "qa", "tests"]
+known-first-party = ["mmecu", "qa", "tests", "tools"]

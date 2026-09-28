@@ -1,0 +1,158 @@
+"""Deploying to / restoring the CIRCUITPY drive, using a temp dir as the drive."""
+
+import os
+import subprocess
+
+import pytest
+
+from tools import circuitpy
+from tools.circuitpy import DriveError
+
+
+def _write(root, rel, data):
+    path = os.path.join(root, rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(data)
+
+
+def _read(root, rel):
+    with open(os.path.join(root, rel), "rb") as f:
+        return f.read()
+
+
+def _snapshot(root):
+    return {rel: _read(root, rel) for rel in circuitpy.walk_files(root)}
+
+
+def _git_show(ref, path):
+    return subprocess.run(
+        ["git", "-C", circuitpy.REPO, "show", f"{ref}:{path}"], capture_output=True, check=True
+    ).stdout
+
+
+@pytest.fixture
+def master():
+    try:
+        _git_show("master", "code.py")
+    except subprocess.CalledProcessError:
+        pytest.skip("no local master branch")
+    return "master"
+
+
+@pytest.fixture
+def drive(tmp_path):
+    """A CIRCUITPY drive with board-owned, OS and client files."""
+    root = str(tmp_path / "CIRCUITPY")
+    _write(root, "boot_out.txt", b"Adafruit CircuitPython 7.0.0 on 2021-09-20; Adafruit Feather M4 CAN\n")
+    _write(root, "code.py", b"# whatever the board runs today\n")
+    _write(root, "notes.txt", b"client notes")
+    _write(root, ".fseventsd/fseventsd-uuid", b"os")
+    return root
+
+
+def test_deploy_working_tree_installs_and_verifies(drive):
+    written = circuitpy.deploy(drive)
+    assert written[-1] == "code.py"
+    assert _read(drive, "code.py") == _read(circuitpy.REPO, "code.py")
+    assert os.path.isfile(os.path.join(drive, "mmecu", "app.py"))
+    assert os.path.isfile(os.path.join(drive, "lib", "adafruit_motor", "servo.mpy"))
+
+
+def test_restore_master_puts_back_the_single_file_firmware(drive, master):
+    circuitpy.deploy(drive)
+    circuitpy.deploy_ref(drive, master)
+    assert _read(drive, "code.py") == _git_show(master, "code.py")
+    assert b"class Application" in _read(drive, "code.py")
+    assert not os.path.exists(os.path.join(drive, "mmecu"))
+    assert os.path.isfile(os.path.join(drive, "lib", "adafruit_motor", "servo.mpy"))
+
+
+def test_deploy_after_restore_brings_the_package_back(drive, master):
+    circuitpy.deploy_ref(drive, master)
+    circuitpy.deploy(drive)
+    assert os.path.isfile(os.path.join(drive, "mmecu", "app.py"))
+
+
+def test_deploying_a_ref_matches_that_commit_exactly(drive):
+    circuitpy.deploy_ref(drive, "HEAD")
+    for rel in ("code.py", "mmecu/app.py", "mmecu/keypad.py"):
+        assert _read(drive, rel) == _git_show("HEAD", rel)
+
+
+def test_other_drive_files_are_left_alone(drive, master):
+    circuitpy.deploy(drive)
+    circuitpy.deploy_ref(drive, master)
+    assert _read(drive, "notes.txt") == b"client notes"
+    assert _read(drive, ".fseventsd/fseventsd-uuid") == b"os"
+    assert b"CircuitPython 7.0.0" in _read(drive, "boot_out.txt")
+
+
+def test_stale_package_modules_are_removed(drive):
+    _write(drive, "mmecu/old_module.py", b"stale")
+    circuitpy.deploy(drive)
+    assert not os.path.exists(os.path.join(drive, "mmecu", "old_module.py"))
+
+
+def test_unknown_ref_fails_before_touching_the_drive(drive):
+    before = _snapshot(drive)
+    with pytest.raises(DriveError, match="cannot read git ref"):
+        circuitpy.deploy_ref(drive, "no-such-branch")
+    assert _snapshot(drive) == before
+
+
+@pytest.mark.parametrize("operation", ["deploy", "deploy_ref"])
+def test_never_touches_a_directory_that_is_not_a_circuitpy_drive(tmp_path, operation):
+    not_a_drive = str(tmp_path / "home")
+    _write(not_a_drive, "important.txt", b"keep me")
+    with pytest.raises(DriveError, match="boot_out.txt"):
+        getattr(circuitpy, operation)(not_a_drive, *(["HEAD"] if operation == "deploy_ref" else []))
+    assert _snapshot(not_a_drive) == {"important.txt": b"keep me"}
+
+
+def test_code_py_is_written_last(monkeypatch, drive):
+    written = []
+    real_copy = circuitpy._copy
+    monkeypatch.setattr(circuitpy, "_copy", lambda source, target: (written.append(target), real_copy(source, target)))
+    circuitpy.deploy(drive)
+    assert os.path.basename(written[-1]) == "code.py"
+    assert sum(os.path.basename(path) == "code.py" for path in written) == 1
+
+
+def test_a_bad_write_is_reported(monkeypatch, drive):
+    monkeypatch.setattr(
+        circuitpy, "_copy", lambda source, target: _write(os.path.dirname(target), os.path.basename(target), b"x")
+    )
+    with pytest.raises(DriveError, match="did not write correctly"):
+        circuitpy.deploy(drive)
+
+
+def test_explicit_drive_is_never_swapped_for_an_auto_detected_one(monkeypatch, tmp_path, drive):
+    monkeypatch.setattr(circuitpy, "AUTO_DETECT_PATHS", [drive])  # a drive is available to auto-detect...
+    monkeypatch.delenv("CIRCUITPY", raising=False)
+    with pytest.raises(DriveError, match="not found"):
+        circuitpy.find_drive(str(tmp_path / "typo"))  # ...but the caller asked for this one
+    monkeypatch.setenv("CIRCUITPY", str(tmp_path / "typo"))
+    with pytest.raises(DriveError, match="not found"):
+        circuitpy.find_drive()
+    monkeypatch.delenv("CIRCUITPY")
+    assert circuitpy.find_drive() == drive
+
+
+def test_cli_restore_and_deploy(drive, master, capsys):
+    assert circuitpy.main(["--drive", drive, "deploy"]) == 0
+    assert circuitpy.main(["--drive", drive, "restore", "--yes"]) == 0
+    assert "Restored git 'master'" in capsys.readouterr().out
+    assert not os.path.exists(os.path.join(drive, "mmecu"))
+
+
+def test_cli_restore_asks_first(monkeypatch, drive, master):
+    before = _snapshot(drive)
+    monkeypatch.setattr("builtins.input", lambda prompt: "no")
+    assert circuitpy.main(["--drive", drive, "restore"]) == 1
+    assert _snapshot(drive) == before
+
+
+def test_cli_reports_errors_without_traceback(tmp_path, capsys):
+    assert circuitpy.main(["--drive", str(tmp_path), "deploy"]) == 2
+    assert "refusing" in capsys.readouterr().err

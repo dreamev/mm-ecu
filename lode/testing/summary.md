@@ -22,6 +22,8 @@ flowchart LR
 - **Events + QA harness** (`test_events`, `test_qa_harness`, `test_qa_serial`): the event
   stream format, the whole `make qa` script replayed on the simulator, and the serial console
   over a pty. See [../qa/summary.md](../qa/summary.md).
+- **Deploy tool** (`test_circuitpy_tool`): deploy and restore against a temp-dir "drive"
+  using real git refs (master restores the single-file firmware), plus drive-safety guards.
 - **Entrypoint** (`test_entrypoint`): runs `code.py` with `runpy` and a stub app
   that stops after 3 ticks.
 - **CircuitPython guard** (`test_circuitpython_compat`): import allowlist,

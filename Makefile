@@ -1,10 +1,10 @@
 VENV := .venv
 BIN := $(VENV)/bin
 
-.PHONY: help setup test lint fmt check deploy watch console qa
+.PHONY: help setup test lint fmt check deploy watch console qa restore
 
 help:  ## list targets
-	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-15s %s\n", $$1, $$2}'
 
 $(BIN)/pytest:
 	python3 -m venv $(VENV)
@@ -25,7 +25,7 @@ fmt: setup  ## autofix lint and format
 
 check: test lint  ## everything CI would run
 
-deploy: check  ## test, then copy firmware to the CIRCUITPY drive
+deploy: check  ## test, then deploy the working tree to the board and verify (undo: make restore)
 	./sync.sh
 
 watch:  ## redeploy on every file change (no tests)
@@ -36,3 +36,6 @@ console:  ## serial console (override PORT=/dev/...)
 
 qa: setup  ## guided hardware QA on the real keypad (ARGS="--only drive -v", PORT=/dev/...)
 	$(BIN)/python -m qa $${PORT:+--port $$PORT} $(ARGS)
+
+restore:  ## put known-good firmware back on the board: deploys git REF (default master)
+	python3 -m tools.circuitpy restore --ref $${REF:-master}
