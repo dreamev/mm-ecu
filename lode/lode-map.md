@@ -14,6 +14,7 @@
   - [summary.md](vehicle/summary.md) — vehicle systems overview
   - [drive-selection.md](vehicle/drive-selection.md) — PRND radio group, blocking relay pulse, parking brake, startup LEDs
   - [battery-gauge.md](vehicle/battery-gauge.md) — 0x126 decode, clamping, servo throttling
+  - [drive-unit-can.md](vehicle/drive-unit-can.md) — Tesla CAN is 500k; history and likely causes of the failed CAN-shift attempt
 - platform/
   - [summary.md](platform/summary.md) — platform overview
   - [hardware.md](platform/hardware.md) — board, pin map, CircuitPython constraints

@@ -20,6 +20,7 @@
 - Shift relay - GPIO output pulsed 0.5 s to request R/N/D from the drive unit.
 - Parking brake triggers - held outputs D6 (engage) / D5 (disengage).
 - DI_hvBusStatus - Tesla drive-unit frame `0x126` carrying HV bus voltage.
+- openinverter - open-source replacement controller commonly used for Tesla drive units in conversions; CAN control via `controlid` with counter + CRC.
 - Gauge - servo needle showing battery state of charge.
 - F1 / F2 - performance modes (slow / fast); radio group.
 - Regen - regenerative braking toggle.

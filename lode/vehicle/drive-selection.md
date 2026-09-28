@@ -65,6 +65,9 @@ def show_drive_state(self):
         self.keypad.set_color(key, DRIVE_COLOR if drive_state == self.drive_state else Color.BLACK)
 ```
 
+Shifting over CAN instead of relays was tried and abandoned. The history and likely
+causes (not bus speed) are in [drive-unit-can.md](drive-unit-can.md).
+
 Code: `mmecu/drivetrain.py` (`Shifter`), `mmecu/parking_brake.py`,
 `mmecu/controller.py` (`select_*`, `_change_drive_state`).
 
