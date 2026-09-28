@@ -73,3 +73,12 @@ def test_ecu_reset_with_pad_already_operational_still_activates_and_draws_leds()
     sim.heartbeat("operational")
     assert sim.sent(NMT_ID)
     assert sim.lit() == {"PARK": "blue"}
+
+
+def test_stopped_heartbeat_restarts_node():
+    # Manual §25: 04h = Stopped. A stopped pad sends no key frames, so restart it.
+    sim = Sim().boot()
+    nmt_before = len(sim.sent(NMT_ID))
+    sim.heartbeat("stopped")
+    assert len(sim.sent(NMT_ID)) == nmt_before + 1
+    assert sim.lit() == {"PARK": "blue"}

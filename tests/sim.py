@@ -19,7 +19,7 @@ KEY_STATE_ID = 0x195
 LED_ID = 0x215
 HV_BUS_ID = 0x126
 
-HEARTBEAT = {"boot_up": 0x00, "pre_operational": 0x7F, "operational": 0x05}
+HEARTBEAT = {"boot_up": 0x00, "stopped": 0x04, "pre_operational": 0x7F, "operational": 0x05}
 
 KEYS = [
     "HAZARD",

@@ -51,12 +51,14 @@ class Color:
 class NodeState:
     UNKNOWN = "Unknown"
     BOOT_UP = "Boot-up"
+    STOPPED = "Stopped"
     PRE_OPERATIONAL = "Pre-operational"
     OPERATIONAL = "Operational"
 
 
 HEARTBEAT_STATES = {
     b"\x00": NodeState.BOOT_UP,
+    b"\x04": NodeState.STOPPED,
     b"\x7f": NodeState.PRE_OPERATIONAL,
     b"\x05": NodeState.OPERATIONAL,
 }
@@ -105,7 +107,7 @@ class Keypad:
         return encode_leds(self._colors)
 
     def needs_start(self):
-        return self.state in (NodeState.BOOT_UP, NodeState.PRE_OPERATIONAL)
+        return self.state in (NodeState.BOOT_UP, NodeState.STOPPED, NodeState.PRE_OPERATIONAL)
 
     def on_heartbeat(self, data):
         state = HEARTBEAT_STATES.get(bytes(data))
