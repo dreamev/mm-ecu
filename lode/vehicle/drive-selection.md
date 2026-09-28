@@ -52,10 +52,18 @@ Boot: if the engaged sensor reads high → `engage()`; elif disengaged sensor hi
 `disengage()` (a no-op since `engaged` starts False, so triggers stay low);
 else log an error. Both high (e.g. unplugged, pull-ups) → treated as engaged.
 
-## Startup LEDs (`VehicleController.show_startup_drive_state`)
-Drawn on every keypad (re)start: NEUTRAL is always blue, PARK is blue iff the
-brake is engaged, and `drive_state` becomes PARK if the brake is engaged.
-Open question 1 in [../plans/roadmap.md](../plans/roadmap.md) covers whether this is intended.
+## Drive LEDs (`VehicleController.show_drive_state`)
+Invariant: exactly one drive key is lit, and it is the key for `drive_state`.
+- Boot: `drive_state` = PARK if the brake sensors report engaged, else NEUTRAL.
+  This is display state only; no relay is pulsed at boot.
+- A keypad (re)start redraws the current `drive_state` without resetting it. For
+  example, NEUTRAL with the brake engaged stays NEUTRAL after a pad reboot.
+
+```python
+def show_drive_state(self):
+    for drive_state, key in DRIVE_KEYS.items():
+        self.keypad.set_color(key, DRIVE_COLOR if drive_state == self.drive_state else Color.BLACK)
+```
 
 Code: `mmecu/drivetrain.py` (`Shifter`), `mmecu/parking_brake.py`,
 `mmecu/controller.py` (`select_*`, `_change_drive_state`).

@@ -21,7 +21,8 @@ class VehicleController:
         self.keypad = keypad
         self.shifter = shifter
         self.parking_brake = parking_brake
-        self.drive_state = DriveState.PARK
+        # Display state only: nothing is actuated at boot
+        self.drive_state = DriveState.PARK if parking_brake.engaged else DriveState.NEUTRAL
         self.hazard = False
         self.exhaust_sound = False
         self._handlers = {
@@ -42,19 +43,10 @@ class VehicleController:
         else:
             handler()
 
-    def show_startup_drive_state(self):
-        """Drive LEDs drawn whenever the keypad is (re)started.
-
-        NEUTRAL is always lit and PARK is lit iff the brake is engaged, regardless
-        of drive_state (see lode/plans/refactor-plan.md, open question 1).
-        """
-        if self.parking_brake.engaged:
-            self.drive_state = DriveState.PARK
-        for key in DRIVE_KEYS.values():
-            self.keypad.set_color(key, Color.BLACK)
-        self.keypad.set_color(Key.NEUTRAL, DRIVE_COLOR)
-        if self.parking_brake.engaged:
-            self.keypad.set_color(Key.PARK, DRIVE_COLOR)
+    def show_drive_state(self):
+        """Light exactly the key for the current drive state."""
+        for drive_state, key in DRIVE_KEYS.items():
+            self.keypad.set_color(key, DRIVE_COLOR if drive_state == self.drive_state else Color.BLACK)
 
     # -- drive selection --
     def select_park(self):
@@ -79,8 +71,7 @@ class VehicleController:
         if state == self.drive_state:
             return
         self.drive_state = state
-        for drive_state, key in DRIVE_KEYS.items():
-            self.keypad.set_color(key, DRIVE_COLOR if drive_state == state else Color.BLACK)
+        self.show_drive_state()
 
     # -- toggles and modes --
     def toggle_hazard(self):

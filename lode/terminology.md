@@ -22,5 +22,5 @@
 - Tick - one iteration of the main loop.
 - Outbox - FIFO of outbound CAN frames; one frame is sent per tick.
 - LEDs dirty - `Keypad` flag meaning the LED model changed and one full LED frame must be sent.
-- Startup drive state - drive LEDs/state drawn on every keypad (re)start.
+- Drive LEDs - exactly the key for the current drive state is lit; boot state is PARK if brake engaged, else NEUTRAL.
 - mmecu - the hardware-free firmware package; `mmecu.hardware` is its only hardware edge.

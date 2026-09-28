@@ -45,13 +45,17 @@ def test_repeated_selection_pulses_relay_again():
     assert sim.lit() == {"DRIVE": "blue"}
 
 
-def test_park_at_boot_with_brake_disengaged_engages_brake_but_leds_unchanged():
-    # Current behavior (see lode open question 1): drive_state is PARK at boot, so
-    # PARK is a no-op state change and its LED is not lit.
+def test_park_at_boot_with_brake_disengaged_engages_brake_and_lights_park():
     sim = Sim(brake="disengaged").boot()
     sim.press("PARK")
     assert sim.brake_outputs() == {"engage": True, "disengage": False}
-    assert sim.lit() == {"NEUTRAL": "blue"}
+    assert sim.lit() == {"PARK": "blue"}
+
+
+def test_boot_with_brake_disengaged_pulses_no_relay():
+    # NEUTRAL at boot is a display state only; nothing is actuated.
+    sim = Sim(brake="disengaged").boot()
+    assert sim.pulses() == []
 
 
 def test_invalid_brake_sensors_leave_triggers_low():
@@ -63,4 +67,4 @@ def test_invalid_brake_sensors_leave_triggers_low():
 def test_both_brake_sensors_high_treated_as_engaged():
     sim = Sim(brake="both").boot()
     assert sim.brake_outputs() == {"engage": True, "disengage": False}
-    assert sim.lit() == {"PARK": "blue", "NEUTRAL": "blue"}
+    assert sim.lit() == {"PARK": "blue"}

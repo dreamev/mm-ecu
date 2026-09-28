@@ -9,10 +9,10 @@ def test_first_tick_sends_nmt_start_before_anything_else():
     assert sim.sent() == [(NMT_ID, [0x01, 0, 0, 0, 0, 0, 0, 0])]
 
 
-def test_boot_with_brake_engaged_lights_park_and_neutral():
+def test_boot_with_brake_engaged_lights_only_park():
     sim = Sim(brake="engaged").boot()
-    assert sim.lit() == {"PARK": "blue", "NEUTRAL": "blue"}
-    assert sim.sent(LED_ID)[-1] == (LED_ID, [0, 0, 0, 0x0A, 0, 0, 0, 0])
+    assert sim.lit() == {"PARK": "blue"}
+    assert sim.sent(LED_ID)[-1] == (LED_ID, [0, 0, 0, 0x02, 0, 0, 0, 0])
 
 
 def test_boot_with_brake_disengaged_lights_only_neutral():
@@ -41,14 +41,19 @@ def test_pad_reboot_restarts_node_and_restores_leds():
     nmt_before = len(sim.sent(NMT_ID))
     sim.heartbeat("boot_up")
     assert len(sim.sent(NMT_ID)) == nmt_before + 1
-    assert sim.lit() == {"PARK": "blue", "NEUTRAL": "blue", "F1": "cyan"}
+    assert sim.lit() == {"PARK": "blue", "F1": "cyan"}
 
 
-def test_pad_reboot_redraws_boot_drive_leds_not_current_selection():
-    # Current behavior (see lode open question 1): a pad reboot redraws the boot
-    # drive LEDs, not the selected drive state.
+def test_pad_reboot_redraws_current_drive_selection():
     sim = Sim(brake="disengaged").boot()
     sim.press("DRIVE")
+    sim.heartbeat("boot_up")
+    assert sim.lit() == {"DRIVE": "blue"}
+
+
+def test_pad_reboot_in_neutral_with_brake_engaged_keeps_neutral():
+    sim = Sim(brake="engaged").boot()
+    sim.press("NEUTRAL")
     sim.heartbeat("boot_up")
     assert sim.lit() == {"NEUTRAL": "blue"}
 
@@ -58,7 +63,7 @@ def test_pre_operational_heartbeat_restarts_node():
     nmt_before = len(sim.sent(NMT_ID))
     sim.heartbeat("pre_operational")
     assert len(sim.sent(NMT_ID)) == nmt_before + 1
-    assert sim.lit() == {"PARK": "blue", "NEUTRAL": "blue"}
+    assert sim.lit() == {"PARK": "blue"}
 
 
 def test_ecu_reset_with_pad_already_operational_still_activates_and_draws_leds():
@@ -67,4 +72,4 @@ def test_ecu_reset_with_pad_already_operational_still_activates_and_draws_leds()
     sim = Sim(brake="engaged")
     sim.heartbeat("operational")
     assert sim.sent(NMT_ID)
-    assert sim.lit() == {"PARK": "blue", "NEUTRAL": "blue"}
+    assert sim.lit() == {"PARK": "blue"}

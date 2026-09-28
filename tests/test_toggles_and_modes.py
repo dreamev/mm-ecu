@@ -4,7 +4,7 @@ import pytest
 
 from tests.sim import Sim
 
-BOOT_LEDS = {"PARK": "blue", "NEUTRAL": "blue"}
+BOOT_LEDS = {"PARK": "blue"}
 
 
 def test_f1_lights_cyan_and_clears_f2():

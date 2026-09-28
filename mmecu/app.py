@@ -55,7 +55,7 @@ class Application:
             return
         self.outbox.push(keypad.NMT_ID, keypad.NMT_START_ALL_NODES)
         self.pad.state = keypad.NodeState.OPERATIONAL
-        self.controller.show_startup_drive_state()
+        self.controller.show_drive_state()
         self._pad_started = True
 
     def _on_heartbeat(self, data):
