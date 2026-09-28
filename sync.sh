@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
+# Copy the firmware to a mounted CIRCUITPY drive (see tools/circuitpy.py).
 #
+#   ./sync.sh            deploy the working tree and verify
+#   ./sync.sh --watch    redeploy on every change (needs fswatch)
+#
+# The drive is auto-detected on macOS and Linux; override with CIRCUITPY=/path.
+# Put known-good firmware back with `make restore` (deploys release tag v1.0.0).
+set -euo pipefail
+cd "$(dirname "$0")"
 
-fswatch -o code.py | while read num; do
-    cp code.py /Volumes/CIRCUITPY
-done
+python3 -m tools.circuitpy deploy
+if [[ "${1:-}" == "--watch" ]]; then
+    fswatch -o code.py mmecu lib | while read -r _; do
+        python3 -m tools.circuitpy deploy
+    done
+fi

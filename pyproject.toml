@@ -1,2 +1,20 @@
 [tool.pyright]
 reportShadowedImports = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# importlib mode keeps the repo root off the front of sys.path, so the firmware's
+# code.py never shadows the stdlib `code` module (which pdb imports).
+addopts = "--import-mode=importlib"
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"  # closest CPython to the CircuitPython 7 language subset
+extend-exclude = ["lode"]  # markdown snippets are illustrative, not code
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "SIM", "C4", "RET", "PIE"]
+
+[tool.ruff.lint.isort]
+known-third-party = ["board", "canio", "digitalio", "pwmio", "adafruit_motor"]
+known-first-party = ["mmecu", "qa", "tests", "tools"]

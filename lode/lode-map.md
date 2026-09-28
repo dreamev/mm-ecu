@@ -1,0 +1,30 @@
+# Lode map
+
+- [summary.md](summary.md) — one-paragraph snapshot of the system
+- [terminology.md](terminology.md) — domain vocabulary
+- [practices.md](practices.md) — CircuitPython-subset rules, test conventions, workflow
+- architecture/
+  - [summary.md](architecture/summary.md) — module map, tick sequence, DI contracts
+- keypad/
+  - [summary.md](keypad/summary.md) — keypad domain overview
+  - [can-protocol.md](keypad/can-protocol.md) — CANopen IDs, key bitmask, LED bitfield, node state machine
+  - [button-behaviors.md](keypad/button-behaviors.md) — per-key behavior vs requirements, press-edge dispatch contract
+  - [spec-reference.md](keypad/spec-reference.md) — vendor manual digest: all COB-IDs, factory defaults, required 500k config
+- vehicle/
+  - [summary.md](vehicle/summary.md) — vehicle systems overview
+  - [drive-selection.md](vehicle/drive-selection.md) — PRND radio group, blocking relay pulse, parking brake, startup LEDs
+  - [battery-gauge.md](vehicle/battery-gauge.md) — 0x126 decode, clamping, servo throttling
+  - [drive-unit-can.md](vehicle/drive-unit-can.md) — Tesla CAN is 500k; history and likely causes of the failed CAN-shift attempt
+- platform/
+  - [summary.md](platform/summary.md) — platform overview
+  - [hardware.md](platform/hardware.md) — board, pin map, CircuitPython constraints
+  - [dev-workflow.md](platform/dev-workflow.md) — make targets, deploy contract, restore = deploy release tag v1.0.0
+- testing/
+  - [summary.md](testing/summary.md) — test layers, Sim API, fakes contract, the code.py/stdlib shadowing lesson
+- qa/
+  - [summary.md](qa/summary.md) — `make qa` guided bench test: firmware event vocabulary, step contract, sim replay
+- lessons/
+  - [summary.md](lessons/summary.md) — assessment of v1 (pre-AI) vs v2 (AI-assisted): what to keep, what hurt, open risks, lessons for future work
+- plans/
+  - [roadmap.md](plans/roadmap.md) — open questions for the human, bench-verification checklist, unimplemented requirements, follow-ups
+- tmp/ — git-ignored session scraps

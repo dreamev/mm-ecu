@@ -1,0 +1,42 @@
+# Terminology
+
+- ECU - this firmware / Feather board acting as the vehicle's auxiliary control unit.
+- Pad / keypad - Blink Marine PKP-2600-SI 12-key CANopen keypad with RGB LEDs.
+- Key number - physical keypad position 1–12 (1 = Hazard … 12 = Cruise down).
+- Node ID - CANopen address of the keypad, `0x15`.
+- NMT start - CANopen command (`0x000`, `01 00`) moving nodes to Operational.
+- Heartbeat - periodic keypad frame on `0x715` reporting its node state (off by default on the PKP).
+- Stopped - CANopen node state `04`; the pad sends nothing until restarted.
+- Key edges - presses (down now, not before) and releases (down before, not now) between key-state frames.
+- Key baseline - keys already down when the keypad (re)starts, read via SDO 2000h; they count as held, never as presses.
+- Hold keys - cruise speed ±: lit while held, act on release with the held seconds.
+- VehicleActions - `mmecu/actions.py`; log-only stubs for vehicle effects not yet wired (regen, cruise, power mode, hazard, exhaust).
+- Stub - a VehicleActions method that only logs `TODO ...`; its key handling and LEDs are live.
+- Blink PDO - `0x315`, keypad-native LED blinking with the same layout as the LED frame.
+- Boot-up / Stopped / Pre-operational / Operational - CANopen node states (`00` / `04` / `7F` / `05`).
+- TPDO1 / key-state frame - `0x195`, bitmask of currently held keys.
+- RPDO1 / LED frame - `0x215`, 36-bit RGB bitfield for all 12 keys.
+- Drive state - PARK / REVERSE / NEUTRAL / DRIVE selection.
+- Shift relay - GPIO output pulsed 0.5 s to request R/N/D from the drive unit.
+- Parking brake triggers - held outputs D6 (engage) / D5 (disengage).
+- DI_hvBusStatus - Tesla drive-unit frame `0x126` carrying HV bus voltage.
+- Tesla ECU / drive controller - the purchased third-party ECU that controls the Tesla drive unit; the Feather drives its R/N/D inputs via the custom interface PCB (v32). Model not recorded.
+- openinverter - open-source replacement controller for Tesla drive units; likely NOT used here (the bus carries Tesla-format DI messages). Kept in the lode as a reference example.
+- Gauge - servo needle showing battery state of charge.
+- F1 / F2 - performance modes (slow / fast); radio group.
+- Regen - regenerative braking toggle.
+- Autopilot / Cruise - openpilot cruise toggle and speed up/down keys.
+- Characterization test - black-box test pinning existing behavior before refactoring.
+- Sim - `tests/sim.py` harness driving the app through fake CircuitPython hardware.
+- Tick - one iteration of the main loop.
+- Restore - deploying a known-good release tag (default `v1.0.0`) to the board; git is the backup.
+- v1.0.0 - release tag on the original single-file `code.py` firmware (master @ c205613, pre-refactor).
+- v2.0.0-rc.N - release candidates of the mmecu firmware; v2.0.0 is tagged on master after hardware QA passes.
+- Event (EVT line) - structured `EVT <name> k=v` console line from `log.event`, parsed by the QA harness.
+- QA harness - `qa/` package, `make qa`: guided bench test against the physical keypad.
+- Step - one QA instruction with machine actions (`do`), event checks (`expect`) and a tester question (`confirm`).
+- SimActor - virtual tester replaying QA steps on the simulator in `tests/test_qa_harness.py`.
+- Outbox - FIFO of outbound CAN frames; one frame is sent per tick.
+- LEDs dirty - `Keypad` flag meaning the LED model changed and one full LED frame must be sent.
+- Drive LEDs - exactly the key for the current drive state is lit; boot state is PARK if brake engaged, else NEUTRAL.
+- mmecu - the hardware-free firmware package; `mmecu.hardware` is its only hardware edge.
