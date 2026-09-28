@@ -23,6 +23,8 @@
   - [summary.md](testing/summary.md) — test layers, Sim API, fakes contract, the code.py/stdlib shadowing lesson
 - qa/
   - [summary.md](qa/summary.md) — `make qa` guided bench test: firmware event vocabulary, step contract, sim replay
+- lessons/
+  - [summary.md](lessons/summary.md) — assessment of v1 (pre-AI) vs v2 (AI-assisted): what to keep, what hurt, open risks, lessons for future work
 - plans/
   - [roadmap.md](plans/roadmap.md) — open questions for the human, bench-verification checklist, unimplemented requirements, follow-ups
 - tmp/ — git-ignored session scraps
