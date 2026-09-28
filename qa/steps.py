@@ -139,10 +139,16 @@ def current_drive_lit(ctx):
     return only_drive_lit(ctx.get("drive", "PARK"))
 
 
+TOGGLE_EVENTS = ("hazard", "exhaust_sound", "regen", "cruise")
+
+
 def update_context(ctx, event):
     """Running knowledge of the vehicle, used by ctx-dependent expectations and prompts."""
     if event.name == "ecu_start":
         ctx["drive"], ctx["brake"] = event.fields["drive"], event.fields["brake"]
+        ctx.update(dict.fromkeys(TOGGLE_EVENTS, "0"))  # a fresh firmware starts with all toggles off
+    elif event.name in TOGGLE_EVENTS:
+        ctx[event.name] = event.fields["on"]
     elif event.name == "drive":
         ctx["drive"] = event.fields["state"]
     elif event.name == "brake":
@@ -153,8 +159,14 @@ def update_context(ctx, event):
 
 # --- the script ---------------------------------------------------------------
 class Step:
-    def __init__(self, id, group, instruction, do, expect, confirm=None, timeout=20, optional=False, ready=None):
+    def __init__(
+        self, id, group, instruction, do, expect, confirm=None, timeout=20, optional=False, ready=None, target=None
+    ):
         self.id = id
+        # Context values the step drives the vehicle to. If they already hold when the step
+        # starts (e.g. a retry after the action worked), `do` is skipped so a
+        # non-idempotent action such as a toggle is not undone; only final checks run.
+        self.target = target
         self.ready = ready  # asked before `do` runs, e.g. "Holding HAZARD?" before an automated reset
         self.group = group
         self.instruction = instruction
@@ -197,8 +209,9 @@ def _toggle_steps(key, event, color, label):
                 "toggles",
                 f"Tap {key} to turn {label} {state}.",
                 tap(key),
-                [Saw(event, on=on), Leds({key: color_now})],
+                [Saw("key_down", key=KEY_NUMBER[key]), State(**{event: on}), Leds({key: color_now})],
                 confirm=f"Confirm: {key} is {'lit ' + color if on else 'dark'}.",
+                target={event: on},
             )
         )
     return steps

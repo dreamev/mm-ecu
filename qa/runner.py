@@ -79,11 +79,17 @@ class Runner:
         # a crash while idle between steps still fails the next step
         events, errors = [], self._errors_between_steps
         self._errors_between_steps = []
-        self.ui.say(step.instruction)
-        if step.ready:
-            self.ui.ask(step.ready, {"yes": "ready"})
-        self.actor.perform(step)
-        waiting_for = [check for check in step.expect if not check.final]
+        skip_action = step.target is not None and all(self.ctx.get(k) == str(v) for k, v in step.target.items())
+        if skip_action:
+            self.ui.say(f"The vehicle is already in the target state {step.target}; checking again without an action.")
+            checks = [check for check in step.expect if check.final]
+        else:
+            self.ui.say(step.instruction)
+            if step.ready:
+                self.ui.ask(step.ready, {"yes": "ready"})
+            self.actor.perform(step)
+            checks = step.expect
+        waiting_for = [check for check in checks if not check.final]
         deadline = self.clock() + step.timeout
         while not errors and self.clock() < deadline:
             self._read(0.1, events, errors)
@@ -95,7 +101,7 @@ class Runner:
 
         if errors:
             return Result(step, FAIL, "firmware error: " + errors[0])
-        missing = [str(check) for check in step.expect if not check.met(events, self.ctx)]
+        missing = [str(check) for check in checks if not check.met(events, self.ctx)]
         if missing:
             if step.optional and not events:
                 return Result(step, SKIP, "no events; not testable in this setup")

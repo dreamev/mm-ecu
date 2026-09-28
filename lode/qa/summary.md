@@ -56,6 +56,11 @@ Rule: a new observable behavior should get an event and a QA step.
   - `State(drive=, brake=)`
   - `Count`, `Leds` and `State` are judged after a 1 s settle.
 - `confirm` is a y/n/s question and may use `{drive}` / `{brake}` from the context.
+- `target` holds the context values a non-idempotent step drives the vehicle to (toggles:
+  `{"hazard": 1}`). If they already hold when the step starts, as on a retry after the
+  toggle worked but the tester answered "no", the action is skipped and only the final
+  checks (`State`, `Leds`) run, so a retry never toggles back. The context tracks toggles
+  from their events and resets them on `ecu_start`.
 - `ready` is an optional question asked *before* `do` runs, for example "Are you holding
   HAZARD?" before the automated reset in `held-through-reset`.
 - `optional=True` records a SKIP instead of a FAIL when no events arrive (the gauge

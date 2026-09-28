@@ -154,3 +154,31 @@ def test_report_lists_every_step():
     report = report_markdown(runner.results, "2026-09-28 10:00:00")
     assert f"PASS {len(STEPS)} / FAIL 0 / SKIP 0" in report
     assert all(f"| {step.id} |" in report for step in STEPS)
+
+
+class ScriptedUI(AutoUI):
+    """Answers each prompt from a script, in order (the safety gate is always 'yes')."""
+
+    def __init__(self, answers):
+        super().__init__()
+        self.script = list(answers)
+
+    def ask(self, question, choices):
+        if question.startswith("Is the vehicle safe"):
+            return "yes"
+        answer = self.script.pop(0)
+        assert answer in choices, (question, answer)
+        return answer
+
+
+@pytest.mark.parametrize("step_id, key, color", [("hazard-on", "HAZARD", "yellow"), ("regen-on", "REGEN", "white")])
+def test_retrying_a_toggle_step_after_a_rejected_confirmation_does_not_toggle_back(step_id, key, color):
+    step = next(s for s in STEPS if s.id == step_id)
+    actor = SimActor("engaged")
+    ui = ScriptedUI(["y", "n", "r", "y"])  # startup ok; tester rejects, retries, then confirms
+    runner = Runner(SimConsole(actor), actor, ui, settle=0)
+    runner.run([STEPS[0], step])
+    assert [r.status for r in runner.results] == [PASS, PASS]
+    assert actor.sim.lit()[key] == color
+    assert len(actor.sim.events(step.target and next(iter(step.target)))) == 1  # toggled exactly once
+    assert any("already" in line for line in ui.said)
