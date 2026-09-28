@@ -134,9 +134,15 @@ class Sim:
     def receive(self, can_id, data):
         self.bus.inject(canio.Message(can_id, bytes(data)))
 
-    def press(self, *names):
+    def hold(self, *names):
+        """Send the key-state frame for exactly these keys being down (manual §10: level, not events)."""
         self.receive(KEY_STATE_ID, key_state_payload(*names))
         self.settle()
+
+    def press(self, *names):
+        """Tap: the pad sends a frame on press and another on release."""
+        self.hold(*names)
+        self.release()
 
     def release(self):
         self.receive(KEY_STATE_ID, [0, 0])

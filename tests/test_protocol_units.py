@@ -88,3 +88,20 @@ def test_heartbeat_states(data, state):
     pad = keypad.Keypad()
     pad.on_heartbeat(data)
     assert pad.state == state
+
+
+def test_newly_pressed_reports_only_rising_edges():
+    pad = keypad.Keypad()
+    assert pad.newly_pressed([Key.DRIVE]) == [Key.DRIVE]
+    assert pad.newly_pressed([Key.DRIVE]) == []
+    assert pad.newly_pressed([Key.DRIVE, Key.F1]) == [Key.F1]
+    assert pad.newly_pressed([]) == []
+    assert pad.newly_pressed([Key.DRIVE]) == [Key.DRIVE]
+
+
+def test_restart_forgets_held_keys():
+    pad = keypad.Keypad()
+    pad.newly_pressed([Key.HAZARD])
+    pad.mark_started()
+    assert pad.state == keypad.NodeState.OPERATIONAL
+    assert pad.newly_pressed([Key.HAZARD]) == [Key.HAZARD]

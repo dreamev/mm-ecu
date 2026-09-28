@@ -92,6 +92,7 @@ class Keypad:
     def __init__(self):
         self.state = NodeState.UNKNOWN
         self._colors = [Color.BLACK] * KEY_COUNT
+        self._held = []
         self.leds_dirty = False
 
     def color(self, key):
@@ -105,6 +106,22 @@ class Keypad:
         """Payload for the full LED frame; marks the LEDs as sent."""
         self.leds_dirty = False
         return encode_leds(self._colors)
+
+    def newly_pressed(self, held):
+        """Keys in `held` that were not down in the previous key-state frame.
+
+        Key-state frames carry the level of every key and are sent on any change
+        (and periodically if object 1800h is configured), so only rising edges are
+        presses.
+        """
+        pressed = [key for key in held if key not in self._held]
+        self._held = held
+        return pressed
+
+    def mark_started(self):
+        """We sent NMT start: the pad is Operational with nothing known to be held."""
+        self.state = NodeState.OPERATIONAL
+        self._held = []
 
     def needs_start(self):
         return self.state in (NodeState.BOOT_UP, NodeState.STOPPED, NodeState.PRE_OPERATIONAL)

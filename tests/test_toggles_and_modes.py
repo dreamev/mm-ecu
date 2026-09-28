@@ -65,3 +65,31 @@ def test_short_key_state_payload_is_ignored():
     sim.receive(0x195, [0x10])
     sim.settle()
     assert len(sim.sent()) == before
+
+
+def test_held_key_is_not_retriggered_when_another_key_changes():
+    # Manual §10: the frame carries the level of every key and is sent on any change.
+    sim = Sim().boot()
+    sim.hold("DRIVE")
+    sim.hold("DRIVE", "F1")
+    sim.hold("DRIVE")
+    sim.release()
+    assert sim.pulses() == [("DRIVE", 0.5)]
+    assert sim.lit() == {"DRIVE": "blue", "F1": "cyan"}
+
+
+def test_periodic_state_frames_do_not_retrigger_a_held_key():
+    # Object 1800h sub 5 can make the pad repeat the key-state frame while held.
+    sim = Sim().boot()
+    for _ in range(2):
+        sim.hold("HAZARD")
+    sim.release()
+    assert sim.lit() == {**BOOT_LEDS, "HAZARD": "yellow"}
+
+
+def test_key_pressed_again_after_release_triggers_again():
+    sim = Sim().boot()
+    sim.hold("HAZARD")
+    sim.release()
+    sim.hold("HAZARD")
+    assert sim.lit() == BOOT_LEDS

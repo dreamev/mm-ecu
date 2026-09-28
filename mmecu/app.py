@@ -54,7 +54,7 @@ class Application:
         if self._pad_started and not self.pad.needs_start():
             return
         self.outbox.push(keypad.NMT_ID, keypad.NMT_START_ALL_NODES)
-        self.pad.state = keypad.NodeState.OPERATIONAL
+        self.pad.mark_started()
         self.controller.show_drive_state()
         self._pad_started = True
 
@@ -62,11 +62,11 @@ class Application:
         self.pad.on_heartbeat(data)
 
     def _on_key_state(self, data):
-        keys = keypad.decode_pressed_keys(data)
-        if keys is None:
+        held = keypad.decode_pressed_keys(data)
+        if held is None:
             log.warning(f"short key-state payload: {data}")
             return
-        for key in keys:
+        for key in self.pad.newly_pressed(held):
             self.controller.handle_key(key)
 
     def _on_hv_bus_status(self, data):
