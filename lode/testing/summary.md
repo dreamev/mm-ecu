@@ -15,6 +15,8 @@ flowchart LR
   `test_toggles_and_modes`, `test_battery_gauge`): drive a `Sim` with CAN frames.
   Assert on decoded LED colors, relay pulses, brake outputs, servo angle and
   CAN frames. These tests pinned behavior across the package refactor.
+- **Spec compliance** (`test_keypad_spec_compliance`): the PKP-2600-SI manual's own
+  example frames (§ numbers cited). If one fails, the firmware disagrees with the vendor.
 - **Protocol units** (`test_protocol_units`): LED encoding for every key × color,
   key decoding, frame padding, voltage decode, clamping and heartbeat states.
 - **Entrypoint** (`test_entrypoint`): runs `code.py` with `runpy` and a stub app
@@ -25,7 +27,8 @@ flowchart LR
 ## Sim API
 ```python
 sim = Sim(brake="engaged").boot()      # engaged | disengaged | invalid | both
-sim.press("DRIVE")                      # key-state frame, then tick until idle
+sim.press("DRIVE")                      # tap: press frame + release frame, like the pad
+sim.hold("DRIVE", "F1")                 # level frame for exactly these keys (no release)
 sim.heartbeat("boot_up"); sim.hv_bus(362.5, count=1)
 sim.lit()        # {"DRIVE": "blue"}  decoded from the last LED frame
 sim.pulses()     # [("DRIVE", 0.5)]   relay high time from the fake clock

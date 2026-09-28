@@ -8,7 +8,8 @@
 - keypad/
   - [summary.md](keypad/summary.md) — keypad domain overview
   - [can-protocol.md](keypad/can-protocol.md) — CANopen IDs, key bitmask, LED bitfield, node state machine
-  - [button-behaviors.md](keypad/button-behaviors.md) — per-key behavior vs requirements, dispatch contract
+  - [button-behaviors.md](keypad/button-behaviors.md) — per-key behavior vs requirements, press-edge dispatch contract
+  - [spec-reference.md](keypad/spec-reference.md) — vendor manual digest: all COB-IDs, factory defaults, required 500k config
 - vehicle/
   - [summary.md](vehicle/summary.md) — vehicle systems overview
   - [drive-selection.md](vehicle/drive-selection.md) — PRND radio group, blocking relay pulse, parking brake, startup LEDs

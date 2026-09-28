@@ -10,22 +10,27 @@
    This needs a safety decision.
 
 ## Not yet implemented (from REQUIREMENTS.md)
-- Hazard blink (1 s on / 1 s off); the LED is solid today. Needs a monotonic-clock
-  tick hook in `Application.tick` (don't use sleep, see drive-selection.md).
+- Hazard blink (1 s on / 1 s off); the LED is solid today. The keypad has a native
+  blink PDO (`0x315`, same bit layout as `0x215`, see keypad/spec-reference.md),
+  so no ECU timer is needed. Its blink rate is fixed by the pad and unverified
+  against the 1 s requirement.
 - "Vehicle must be stopped" before drive/function changes (no speed source yet).
 - F1/F2 power + regen commands (LEDs only today); regen toggle; openpilot cruise
   toggle and speed up/down (hold-duration tracking needs key-release edges).
 - Exhaust sound hardware.
 
 ## Engineering follow-ups
+- Keypad provisioning: the factory default is 125 kbit/s; this bus is 500 kbit/s. The
+  one-time SDO commands are in keypad/spec-reference.md. A small provisioning script
+  would make replacing a keypad repeatable.
 - Precompile `mmecu/` with CircuitPython 7 `mpy-cross` if RAM gets tight on-board.
 - CI: run `make check` on pull requests.
 
 ```mermaid
 flowchart TD
   Spd[speed source on CAN] --> Stop[enforce vehicle-stopped rules]
-  Clock[tick clock hook] --> Blink[hazard blink]
-  Clock --> Hold[hold-duration cruise keys]
+  Blink[hazard blink via 0x315 PDO]
+  Release[dispatch key releases] --> Hold[hold-duration cruise keys]
 ```
 
 Related: [../keypad/button-behaviors.md](../keypad/button-behaviors.md).

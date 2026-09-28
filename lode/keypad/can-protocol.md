@@ -6,7 +6,7 @@ are padded/truncated to 8 data bytes.
 | Purpose | COB-ID | Direction | Payload |
 |---|---|---|---|
 | NMT start (all nodes) | `0x000` | ECU → pad | `01 00 …` |
-| Heartbeat | `0x715` (0x700+node) | pad → ECU | `00` boot-up, `7F` pre-operational, `05` operational |
+| Heartbeat | `0x715` (0x700+node) | pad → ECU | `00` boot-up, `04` stopped, `7F` pre-operational, `05` operational |
 | Key state (TPDO1) | `0x195` (0x180+node) | pad → ECU | bytes 0–1: little-endian bitmask, bit `n-1` = key `n` pressed |
 | LED colors (RPDO1) | `0x215` (0x200+node) | ECU → pad | 36-bit little-endian bitfield (below) |
 
@@ -15,8 +15,10 @@ are padded/truncated to 8 data bytes.
 mask = data[0] | (data[1] << 8)          # keypad.decode_pressed_keys; None if len < 2
 pressed = [n for n in range(1, 13) if mask >> (n - 1) & 1]
 ```
-The pad reports the *current* set of held keys on every change, so a release
-produces an all-zero frame (which the ECU ignores).
+The pad reports the *level* of every key on every press or release. `Keypad.newly_pressed`
+keeps the previous frame's held keys and returns only rising edges, so a release, a
+repeated frame, or a second key going down never re-triggers a held key. The held set
+clears on every NMT start (`Keypad.mark_started`).
 
 ## LED bitfield
 Red occupies bits 0–11, green 12–23, blue 24–35; within a channel bit `n-1` is key `n`.
@@ -61,6 +63,8 @@ stateDiagram-v2
   PreOperational --> Operational: next tick → NMT start + drive LEDs
   Operational --> PreOperational: heartbeat 7F
   BootUp --> PreOperational: heartbeat 7F
+  Operational --> Stopped: heartbeat 04
+  Stopped --> Operational: next tick → NMT start + drive LEDs
 ```
 Heartbeats are matched on the exact payload (`b"\x05"` etc.). Anything else is logged
 and ignored.
@@ -72,5 +76,6 @@ Invariants:
 - The LED frame is a full snapshot, so changes within a tick are coalesced into
   one frame (`Keypad.leds_dirty`).
 
-References: datasheet and CANopen manual links are in [../../readme.md](../../readme.md).
+Full vendor-manual summary, factory defaults and required keypad configuration
+(500 kbit/s): [spec-reference.md](spec-reference.md).
 Related: [summary.md](summary.md), [button-behaviors.md](button-behaviors.md).

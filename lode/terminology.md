@@ -5,8 +5,11 @@
 - Key number - physical keypad position 1–12 (1 = Hazard … 12 = Cruise down).
 - Node ID - CANopen address of the keypad, `0x15`.
 - NMT start - CANopen command (`0x000`, `01 00`) moving nodes to Operational.
-- Heartbeat - periodic keypad frame on `0x715` reporting its node state.
-- Boot-up / Pre-operational / Operational - CANopen node states (`00` / `7F` / `05`).
+- Heartbeat - periodic keypad frame on `0x715` reporting its node state (off by default on the PKP).
+- Stopped - CANopen node state `04`; the pad sends nothing until restarted.
+- Rising edge / new press - a key down in this key-state frame but not in the previous one.
+- Blink PDO - `0x315`, keypad-native LED blinking with the same layout as the LED frame.
+- Boot-up / Stopped / Pre-operational / Operational - CANopen node states (`00` / `04` / `7F` / `05`).
 - TPDO1 / key-state frame - `0x195`, bitmask of currently held keys.
 - RPDO1 / LED frame - `0x215`, 36-bit RGB bitfield for all 12 keys.
 - Drive state - PARK / REVERSE / NEUTRAL / DRIVE selection.

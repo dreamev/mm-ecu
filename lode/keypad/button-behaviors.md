@@ -21,14 +21,15 @@ LED colors are 1-bit per channel: red, green, blue, yellow, cyan, magenta,
 white, black (off). "Orange" is not representable.
 
 ## Dispatch contract
-- A key-state frame may report several held keys; each is handled in key order 1→12.
+- Only rising edges are acted on (`Keypad.newly_pressed`). A key-state frame is a level
+  snapshot sent on any change, so held keys are never re-triggered.
+- Several keys going down in the same frame are handled in key order 1→12.
 - Keys with no handler (REGEN, AUTOPILOT_*) are logged at debug and ignored.
-- Only presses are acted on; there is no press/release edge detection, so a frame that
-  repeats a held key re-triggers it.
+- Releases are not dispatched yet; hold-duration features (cruise ±) will need them.
 
 ```mermaid
 flowchart LR
-  F[0x195 frame] --> D[decode held keys] --> L{for each key 1..12}
+  F[0x195 frame] --> D[decode held keys] --> E[rising edges only] --> L{for each new key}
   L --> H[handler table]
   H --> S[vehicle state change]
   H --> C[LED model change]
@@ -40,4 +41,4 @@ flowchart LR
 self._handlers = {Key.HAZARD: self.toggle_hazard, Key.PARK: self.select_park, ...}
 ```
 
-Related: [can-protocol.md](can-protocol.md), [../vehicle/drive-selection.md](../vehicle/drive-selection.md).
+Related: [spec-reference.md](spec-reference.md), [can-protocol.md](can-protocol.md), [../vehicle/drive-selection.md](../vehicle/drive-selection.md).

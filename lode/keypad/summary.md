@@ -13,3 +13,4 @@ flowchart LR
 
 - Wire protocol, bit layouts, node state machine: [can-protocol.md](can-protocol.md)
 - Per-key behavior and requirement gaps: [button-behaviors.md](button-behaviors.md)
+- Vendor manual digest, defaults, required keypad config: [spec-reference.md](spec-reference.md)
