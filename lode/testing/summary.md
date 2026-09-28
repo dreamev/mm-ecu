@@ -23,7 +23,8 @@ flowchart LR
   stream format, the whole `make qa` script replayed on the simulator, and the serial console
   over a pty. See [../qa/summary.md](../qa/summary.md).
 - **Deploy tool** (`test_circuitpy_tool`): deploy and restore against a temp-dir "drive"
-  using real git refs (master restores the single-file firmware), plus drive-safety guards.
+  using real git refs (tag v1.0.0 restores the single-file firmware; the default must be a
+  tag), plus drive-safety guards.
 - **Entrypoint** (`test_entrypoint`): runs `code.py` with `runpy` and a stub app
   that stops after 3 ticks.
 - **CircuitPython guard** (`test_circuitpython_compat`): import allowlist,

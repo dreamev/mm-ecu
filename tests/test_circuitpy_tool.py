@@ -32,12 +32,17 @@ def _git_show(ref, path):
 
 
 @pytest.fixture
-def master():
+def v1():
     try:
-        _git_show("master", "code.py")
+        _git_show("v1.0.0", "code.py")
     except subprocess.CalledProcessError:
-        pytest.skip("no local master branch")
-    return "master"
+        pytest.skip("v1.0.0 tag not fetched (git fetch --tags)")
+    return "v1.0.0"
+
+
+def test_default_restore_target_is_the_v1_tag_not_a_moving_branch(v1):
+    assert v1 == circuitpy.RESTORE_REF
+    subprocess.run(["git", "-C", circuitpy.REPO, "rev-parse", "--verify", f"refs/tags/{v1}"], check=True)
 
 
 @pytest.fixture
@@ -59,17 +64,17 @@ def test_deploy_working_tree_installs_and_verifies(drive):
     assert os.path.isfile(os.path.join(drive, "lib", "adafruit_motor", "servo.mpy"))
 
 
-def test_restore_master_puts_back_the_single_file_firmware(drive, master):
+def test_restore_v1_puts_back_the_single_file_firmware(drive, v1):
     circuitpy.deploy(drive)
-    circuitpy.deploy_ref(drive, master)
-    assert _read(drive, "code.py") == _git_show(master, "code.py")
+    circuitpy.deploy_ref(drive, v1)
+    assert _read(drive, "code.py") == _git_show(v1, "code.py")
     assert b"class Application" in _read(drive, "code.py")
     assert not os.path.exists(os.path.join(drive, "mmecu"))
     assert os.path.isfile(os.path.join(drive, "lib", "adafruit_motor", "servo.mpy"))
 
 
-def test_deploy_after_restore_brings_the_package_back(drive, master):
-    circuitpy.deploy_ref(drive, master)
+def test_deploy_after_restore_brings_the_package_back(drive, v1):
+    circuitpy.deploy_ref(drive, v1)
     circuitpy.deploy(drive)
     assert os.path.isfile(os.path.join(drive, "mmecu", "app.py"))
 
@@ -80,9 +85,9 @@ def test_deploying_a_ref_matches_that_commit_exactly(drive):
         assert _read(drive, rel) == _git_show("HEAD", rel)
 
 
-def test_other_drive_files_are_left_alone(drive, master):
+def test_other_drive_files_are_left_alone(drive, v1):
     circuitpy.deploy(drive)
-    circuitpy.deploy_ref(drive, master)
+    circuitpy.deploy_ref(drive, v1)
     assert _read(drive, "notes.txt") == b"client notes"
     assert _read(drive, ".fseventsd/fseventsd-uuid") == b"os"
     assert b"CircuitPython 7.0.0" in _read(drive, "boot_out.txt")
@@ -139,14 +144,14 @@ def test_explicit_drive_is_never_swapped_for_an_auto_detected_one(monkeypatch, t
     assert circuitpy.find_drive() == drive
 
 
-def test_cli_restore_and_deploy(drive, master, capsys):
+def test_cli_restore_and_deploy(drive, v1, capsys):
     assert circuitpy.main(["--drive", drive, "deploy"]) == 0
     assert circuitpy.main(["--drive", drive, "restore", "--yes"]) == 0
-    assert "Restored git 'master'" in capsys.readouterr().out
+    assert "Restored git 'v1.0.0'" in capsys.readouterr().out
     assert not os.path.exists(os.path.join(drive, "mmecu"))
 
 
-def test_cli_restore_asks_first(monkeypatch, drive, master):
+def test_cli_restore_asks_first(monkeypatch, drive, v1):
     before = _snapshot(drive)
     monkeypatch.setattr("builtins.input", lambda prompt: "no")
     assert circuitpy.main(["--drive", drive, "restore"]) == 1

@@ -17,7 +17,7 @@
 - platform/
   - [summary.md](platform/summary.md) — platform overview
   - [hardware.md](platform/hardware.md) — board, pin map, CircuitPython constraints
-  - [dev-workflow.md](platform/dev-workflow.md) — make targets, deploy contract, restore = deploy git master
+  - [dev-workflow.md](platform/dev-workflow.md) — make targets, deploy contract, restore = deploy release tag v1.0.0
 - testing/
   - [summary.md](testing/summary.md) — test layers, Sim API, fakes contract, the code.py/stdlib shadowing lesson
 - qa/

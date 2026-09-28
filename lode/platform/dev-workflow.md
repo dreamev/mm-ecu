@@ -3,7 +3,7 @@
 ```mermaid
 flowchart LR
   edit --> test[make test] --> lint[make lint] --> deploy[make deploy] --> qa[make qa]
-  deploy -. trouble .-> restore[make restore: git master]
+  deploy -. trouble .-> restore[make restore: tag v1.0.0]
   edit -. fast loop on hardware .-> watch[make watch]
 ```
 
@@ -13,17 +13,21 @@ flowchart LR
 | `make test` / `make lint` / `make fmt` | suite / ruff check + format check / autofix |
 | `make check` | test + lint |
 | `make deploy` | `check`, then deploy the working tree to the board and verify |
-| `make restore` | deploy known-good git `REF` (default `master`); asks first |
+| `make restore` | deploy known-good release tag `REF` (default `v1.0.0`); asks first |
 | `make watch` | `./sync.sh --watch` (fswatch), no tests |
 | `make console` | `screen <port> 115200`; `PORT=` overrides |
 | `make qa` | guided hardware QA on the real keypad ([../qa/summary.md](../qa/summary.md)); `ARGS=`, `PORT=` |
 
 ## Deploy contract (`tools/circuitpy.py`, stdlib only, Python ≥ 3.7)
 - **Git is the backup.** The board only runs what is in this repo, so restoring means
-  deploying a known-good ref: `make restore` deploys `master` (the original
+  deploying a known-good **release tag**: `make restore` deploys `v1.0.0` (the original
   single-file firmware) and `make restore REF=<tag/sha>` deploys any other ref.
   `python -m tools.circuitpy deploy --ref X` does the same without the prompt. Refs
   are exported with `git archive` (committed content only, never uncommitted edits).
+- Invariant: `RESTORE_REF` is a tag, never a branch. `master` moves when PRs merge, so
+  "restore master" would silently stop meaning "go back". A test enforces this.
+- Releases: `v1.0.0` = original single-file firmware (master @ `c205613`). The next
+  release tag goes on the merge commit once `make qa` passes on hardware.
 - Drive: `--drive` / `$CIRCUITPY` if given; it is **never** swapped for an
   auto-detected drive. Otherwise the tool tries `/Volumes/CIRCUITPY`,
   `/run/media/$USER/CIRCUITPY` and `/media/$USER/CIRCUITPY`.
@@ -37,7 +41,7 @@ flowchart LR
   the drive to a folder by hand once before the first deploy on an unknown board.
 
 ```bash
-CIRCUITPY=/mnt/CIRCUITPY make restore REF=v1.0
+CIRCUITPY=/mnt/CIRCUITPY make restore REF=v1.0.0
 ```
 
 Related: [hardware.md](hardware.md), [../testing/summary.md](../testing/summary.md).

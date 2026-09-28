@@ -26,7 +26,8 @@
 - Characterization test - black-box test pinning existing behavior before refactoring.
 - Sim - `tests/sim.py` harness driving the app through fake CircuitPython hardware.
 - Tick - one iteration of the main loop.
-- Restore - deploying a known-good git ref (default `master`) to the board; git is the backup.
+- Restore - deploying a known-good release tag (default `v1.0.0`) to the board; git is the backup.
+- v1.0.0 - release tag on the original single-file `code.py` firmware (master @ c205613, pre-refactor).
 - Event (EVT line) - structured `EVT <name> k=v` console line from `log.event`, parsed by the QA harness.
 - QA harness - `qa/` package, `make qa`: guided bench test against the physical keypad.
 - Step - one QA instruction with machine actions (`do`), event checks (`expect`) and a tester question (`confirm`).

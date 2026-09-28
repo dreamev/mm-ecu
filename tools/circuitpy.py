@@ -1,13 +1,14 @@
 """Deploy this repo's firmware, from the working tree or any git ref, to a CIRCUITPY drive.
 
     python -m tools.circuitpy deploy                 # working tree
-    python -m tools.circuitpy deploy --ref master    # any commit/branch/tag
-    python -m tools.circuitpy restore [--ref master] [--yes]
+    python -m tools.circuitpy deploy --ref v1.0.0    # any commit/branch/tag
+    python -m tools.circuitpy restore [--ref v1.0.0] [--yes]
 
-"Restore" is a deploy of a known-good ref (default: master, the original
-single-file firmware). The board only ever runs what is in this repo, so git is
-the backup. Nothing is written to a directory that does not look like a
-CircuitPython drive (no boot_out.txt). Standard library only.
+"Restore" is a deploy of a known-good release tag (default: v1.0.0, the original
+single-file firmware). Always a tag, never a branch: branches move. The board
+only ever runs what is in this repo, so git is the backup. Nothing is written
+to a directory that does not look like a CircuitPython drive (no boot_out.txt).
+Standard library only.
 """
 
 import argparse
@@ -23,7 +24,7 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DRIVE_MARKER = "boot_out.txt"  # written by CircuitPython at every boot
 FIRMWARE_PACKAGE = "mmecu"
-RESTORE_REF = "master"
+RESTORE_REF = "v1.0.0"  # a release tag, never a branch (master moves on merge)
 SYSTEM_NAMES = {"System Volume Information", "$RECYCLE.BIN"}
 _USER = os.environ.get("USER", "")
 AUTO_DETECT_PATHS = ["/Volumes/CIRCUITPY", f"/run/media/{_USER}/CIRCUITPY", f"/media/{_USER}/CIRCUITPY"]

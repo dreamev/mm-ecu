@@ -5,7 +5,7 @@
 #   ./sync.sh --watch    redeploy on every change (needs fswatch)
 #
 # The drive is auto-detected on macOS and Linux; override with CIRCUITPY=/path.
-# Put known-good firmware back with `make restore` (deploys git master).
+# Put known-good firmware back with `make restore` (deploys release tag v1.0.0).
 set -euo pipefail
 cd "$(dirname "$0")"
 

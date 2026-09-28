@@ -37,5 +37,5 @@ console:  ## serial console (override PORT=/dev/...)
 qa: setup  ## guided hardware QA on the real keypad (ARGS="--only drive -v", PORT=/dev/...)
 	$(BIN)/python -m qa $${PORT:+--port $$PORT} $(ARGS)
 
-restore:  ## put known-good firmware back on the board: deploys git REF (default master)
-	python3 -m tools.circuitpy restore --ref $${REF:-master}
+restore:  ## put known-good firmware back: deploys release tag REF (default v1.0.0)
+	python3 -m tools.circuitpy restore $(if $(REF),--ref $(REF))
