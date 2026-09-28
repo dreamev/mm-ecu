@@ -20,7 +20,7 @@ lode/            project knowledge base (protocols, wiring, design notes)
 ```
 make test        # full suite on CPython, no board needed (~0.1 s)
 make lint        # ruff
-make deploy      # test + copy firmware to the mounted CIRCUITPY drive (verified)
+make deploy      # test + copy firmware to the mounted CIRCUITPY drive (verified); REF=<tag> for a release
 make restore     # put the known-good firmware back: deploys tag v1.0.0 (REF=... for another)
 make watch       # redeploy on every save (needs fswatch)
 make console     # serial console, 115200 baud (PORT=/dev/... to override)

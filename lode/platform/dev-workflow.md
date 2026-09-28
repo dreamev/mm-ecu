@@ -12,7 +12,7 @@ flowchart LR
 | `make setup` | `.venv` with pytest, ruff, pyserial |
 | `make test` / `make lint` / `make fmt` | suite / ruff check + format check / autofix |
 | `make check` | test + lint |
-| `make deploy` | `check`, then deploy the working tree to the board and verify |
+| `make deploy` | `check`, then deploy the working tree (or `REF=<tag>`) to the board and verify |
 | `make restore` | deploy known-good release tag `REF` (default `v1.0.0`); asks first |
 | `make watch` | `./sync.sh --watch` (fswatch), no tests |
 | `make console` | `screen <port> 115200`; `PORT=` overrides |
@@ -26,8 +26,10 @@ flowchart LR
   are exported with `git archive` (committed content only, never uncommitted edits).
 - Invariant: `RESTORE_REF` is a tag, never a branch. `master` moves when PRs merge, so
   "restore master" would silently stop meaning "go back". A test enforces this.
-- Releases: `v1.0.0` = original single-file firmware (master @ `c205613`). The next
-  release tag goes on the merge commit once `make qa` passes on hardware.
+- Releases are annotated tags. `v1.0.0` is the original single-file firmware (master @
+  `c205613`). `v2.0.0-rc.1` is the mmecu branch awaiting hardware QA. Bench fixes become
+  `-rc.2`, and so on. `v2.0.0` goes on the master merge commit once `make qa` passes.
+  Deploy a release with `make deploy REF=<tag>`, so the QA report names an exact build.
 - Drive: `--drive` / `$CIRCUITPY` if given; it is **never** swapped for an
   auto-detected drive. Otherwise the tool tries `/Volumes/CIRCUITPY`,
   `/run/media/$USER/CIRCUITPY` and `/media/$USER/CIRCUITPY`.

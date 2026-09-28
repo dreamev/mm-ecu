@@ -25,8 +25,8 @@ fmt: setup  ## autofix lint and format
 
 check: test lint  ## everything CI would run
 
-deploy: check  ## test, then deploy the working tree to the board and verify (undo: make restore)
-	./sync.sh
+deploy: check  ## test, then deploy the working tree (or REF=tag) to the board and verify
+	$(if $(REF),python3 -m tools.circuitpy deploy --ref $(REF),./sync.sh)
 
 watch:  ## redeploy on every file change (no tests)
 	./sync.sh --watch
