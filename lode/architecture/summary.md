@@ -7,9 +7,10 @@ unchanged on CPython under test.
 | Module | Owns |
 |---|---|
 | `code.py` | log level, CAN transceiver wake, `while True: app.tick()` |
-| `mmecu/hardware.py` | pin map, `CanBus` (canio wrapper), `build_application(sleep=)` |
+| `mmecu/hardware.py` | pin map, `CanBus` (canio wrapper), `build_application(sleep=, clock=, actions=)` |
 | `mmecu/app.py` | `Application.tick()`, CAN dispatch table, keypad start lifecycle, `LISTEN_IDS` |
-| `mmecu/controller.py` | `VehicleController`: key → action table, drive/toggle/mode state, LED choices |
+| `mmecu/controller.py` | `VehicleController`: press/release tables for all 12 keys, drive/toggle/mode/cruise state, LED choices, hold timing |
+| `mmecu/actions.py` | `VehicleActions` stubs (log-only) for effects not wired yet; `PowerMode` |
 | `mmecu/keypad.py` | CANopen IDs, `Key`, `Color`, `NodeState`, key decode, LED encode, `Keypad` model |
 | `mmecu/drivetrain.py` | `DriveState`, `Shifter` (blocking relay pulse) |
 | `mmecu/parking_brake.py` | `ParkingBrake` (sensor sync at boot, held triggers) |
@@ -28,6 +29,7 @@ flowchart TD
   Ctl --> Pad
   Ctl --> Shifter[drivetrain.Shifter]
   Ctl --> Brake[parking_brake.ParkingBrake]
+  Ctl --> Actions[actions.VehicleActions stubs]
 ```
 
 ## One tick
@@ -51,7 +53,8 @@ sequenceDiagram
 - `Keypad.set_color` only marks LEDs dirty; `Application` sends one coalesced
   full-state LED frame per tick.
 - Dependencies are injected. Anything with `.value` can be a pin, anything with
-  `.angle` can be the servo, and `sleep` is a parameter.
+  `.angle` can be the servo, and `sleep`, `clock` (monotonic seconds) and `actions`
+  are parameters.
 
 ```python
 # wiring a test double is just passing objects

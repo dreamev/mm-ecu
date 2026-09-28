@@ -35,3 +35,19 @@ def test_code_py_wakes_transceiver_and_ticks_application(monkeypatch):
 def test_real_application_builds_and_ticks_with_fake_hardware():
     app = hardware.build_application(sleep=lambda seconds: None)
     app.tick()
+
+
+def test_default_actions_are_logging_stubs_for_every_key():
+    from tests.sim import KEYS, key_state_payload
+
+    app = hardware.build_application(sleep=lambda seconds: None)
+    for name in KEYS:
+        for payload in (key_state_payload(name), [0, 0]):
+            app.bus._listener.inbox.append(canio_message(payload))
+            app.tick()
+
+
+def canio_message(payload):
+    import canio
+
+    return canio.Message(0x195, bytes(payload))

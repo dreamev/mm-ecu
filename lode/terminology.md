@@ -7,7 +7,10 @@
 - NMT start - CANopen command (`0x000`, `01 00`) moving nodes to Operational.
 - Heartbeat - periodic keypad frame on `0x715` reporting its node state (off by default on the PKP).
 - Stopped - CANopen node state `04`; the pad sends nothing until restarted.
-- Rising edge / new press - a key down in this key-state frame but not in the previous one.
+- Key edges - presses (down now, not before) and releases (down before, not now) between key-state frames.
+- Hold keys - cruise speed ±: lit while held, act on release with the held seconds.
+- VehicleActions - `mmecu/actions.py`; log-only stubs for vehicle effects not yet wired (regen, cruise, power mode, hazard, exhaust).
+- Stub - a VehicleActions method that only logs `TODO ...`; its key handling and LEDs are live.
 - Blink PDO - `0x315`, keypad-native LED blinking with the same layout as the LED frame.
 - Boot-up / Stopped / Pre-operational / Operational - CANopen node states (`00` / `04` / `7F` / `05`).
 - TPDO1 / key-state frame - `0x195`, bitmask of currently held keys.

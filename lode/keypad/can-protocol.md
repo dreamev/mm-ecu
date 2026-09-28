@@ -15,10 +15,10 @@ are padded/truncated to 8 data bytes.
 mask = data[0] | (data[1] << 8)          # keypad.decode_pressed_keys; None if len < 2
 pressed = [n for n in range(1, 13) if mask >> (n - 1) & 1]
 ```
-The pad reports the *level* of every key on every press or release. `Keypad.newly_pressed`
-keeps the previous frame's held keys and returns only rising edges, so a release, a
-repeated frame, or a second key going down never re-triggers a held key. The held set
-clears on every NMT start (`Keypad.mark_started`).
+The pad reports the *level* of every key on every press or release. `Keypad.key_edges`
+compares with the previous frame and returns `(pressed, released)`, so a repeated frame
+or a second key going down never re-triggers a held key. The held set clears on every
+NMT start (`Keypad.mark_started`).
 
 ## LED bitfield
 Red occupies bits 0–11, green 12–23, blue 24–35; within a channel bit `n-1` is key `n`.

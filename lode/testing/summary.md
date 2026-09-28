@@ -29,6 +29,8 @@ flowchart LR
 sim = Sim(brake="engaged").boot()      # engaged | disengaged | invalid | both
 sim.press("DRIVE")                      # tap: press frame + release frame, like the pad
 sim.hold("DRIVE", "F1")                 # level frame for exactly these keys (no release)
+sim.wait(1.5)                           # advance the fake monotonic clock (hold timing)
+sim.actions.calls                       # [("set_regen", True), ...] via RecordingActions
 sim.heartbeat("boot_up"); sim.hv_bus(362.5, count=1)
 sim.lit()        # {"DRIVE": "blue"}  decoded from the last LED frame
 sim.pulses()     # [("DRIVE", 0.5)]   relay high time from the fake clock
@@ -36,6 +38,9 @@ sim.brake_outputs(); sim.gauge.angle; sim.sent(can_id)
 ```
 The protocol helpers in `sim.py` (`key_state_payload`, `decode_leds`,
 `hv_bus_payload`) are written from the spec, independently of `mmecu`.
+
+`RecordingActions` replaces `VehicleActions` and raises on any action name that
+`VehicleActions` does not define, so a typo in the controller fails the tests.
 
 ## Fakes contract
 - Fakes reproduce the real failure modes. The servo raises `ValueError` outside

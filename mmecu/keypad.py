@@ -107,16 +107,17 @@ class Keypad:
         self.leds_dirty = False
         return encode_leds(self._colors)
 
-    def newly_pressed(self, held):
-        """Keys in `held` that were not down in the previous key-state frame.
+    def key_edges(self, held):
+        """(pressed, released) keys relative to the previous key-state frame.
 
         Key-state frames carry the level of every key and are sent on any change
-        (and periodically if object 1800h is configured), so only rising edges are
-        presses.
+        (and periodically if object 1800h is configured), so presses and releases
+        are the edges between consecutive frames.
         """
         pressed = [key for key in held if key not in self._held]
+        released = [key for key in self._held if key not in held]
         self._held = held
-        return pressed
+        return pressed, released
 
     def mark_started(self):
         """We sent NMT start: the pad is Operational with nothing known to be held."""

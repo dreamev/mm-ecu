@@ -10,14 +10,19 @@
    This needs a safety decision.
 
 ## Not yet implemented (from REQUIREMENTS.md)
-- Hazard blink (1 s on / 1 s off); the LED is solid today. The keypad has a native
-  blink PDO (`0x315`, same bit layout as `0x215`, see keypad/spec-reference.md),
-  so no ECU timer is needed. Its blink rate is fixed by the pad and unverified
-  against the 1 s requirement.
-- "Vehicle must be stopped" before drive/function changes (no speed source yet).
-- F1/F2 power + regen commands (LEDs only today); regen toggle; openpilot cruise
-  toggle and speed up/down (hold-duration tracking needs key-release edges).
-- Exhaust sound hardware.
+Every key is handled; these effects are log-only stubs in `mmecu/actions.py`
+(`VehicleActions`) waiting for their CAN messages or hardware:
+- `set_power_mode` (F1/F2 power + regen levels), `set_regen`, `set_cruise`,
+  `adjust_cruise_speed` (openpilot), `set_hazard` (hazard lights), `set_exhaust_sound`.
+
+Still missing beyond the stubs:
+- Hazard LED blink (1 s on / 1 s off); the LED is solid today. The keypad has a native
+  blink PDO (`0x315`, same bit layout as `0x215`, see keypad/spec-reference.md), so no
+  ECU timer is needed. Its blink rate is fixed by the pad and unverified against the
+  1 s requirement.
+- "Vehicle must be stopped" before drive/power-mode changes (no speed source yet).
+- The cruise speed step per held second is the implementer's choice inside
+  `adjust_cruise_speed`.
 
 ## Engineering follow-ups
 - Keypad provisioning: the factory default is 125 kbit/s; this bus is 500 kbit/s. The
@@ -30,7 +35,7 @@
 flowchart TD
   Spd[speed source on CAN] --> Stop[enforce vehicle-stopped rules]
   Blink[hazard blink via 0x315 PDO]
-  Release[dispatch key releases] --> Hold[hold-duration cruise keys]
+  Stubs[fill VehicleActions stubs] --> Cruise[openpilot cruise]
 ```
 
 Related: [../keypad/button-behaviors.md](../keypad/button-behaviors.md).

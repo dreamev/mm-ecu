@@ -88,11 +88,25 @@ class FakeTime:
         self.now += seconds
 
 
+class RecordingActions:
+    """Stands in for mmecu.actions.VehicleActions and records every call."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __getattr__(self, name):
+        from mmecu.actions import VehicleActions
+
+        if name.startswith("_") or not hasattr(VehicleActions, name):
+            raise AttributeError(f"VehicleActions has no action {name!r}")
+        return lambda *args: self.calls.append((name, *args))
+
+
 # --- construction (the only firmware-specific part) -----------------------
-def _build_app(clock):
+def _build_app(clock, actions):
     from mmecu import hardware
 
-    return hardware.build_application(sleep=clock.sleep)
+    return hardware.build_application(sleep=clock.sleep, clock=clock.monotonic, actions=actions)
 
 
 class Sim:
@@ -108,7 +122,8 @@ class Sim:
         digitalio.input_levels[BRAKE_ENGAGED_SENSOR] = levels[0]
         digitalio.input_levels[BRAKE_DISENGAGED_SENSOR] = levels[1]
         self.clock = FakeTime()
-        self.app = _build_app(self.clock)
+        self.actions = RecordingActions()
+        self.app = _build_app(self.clock, self.actions)
         self.bus = canio.buses[-1]
 
     # -- driving the ECU --
@@ -143,6 +158,9 @@ class Sim:
         """Tap: the pad sends a frame on press and another on release."""
         self.hold(*names)
         self.release()
+
+    def wait(self, seconds):
+        self.clock.now += seconds
 
     def release(self):
         self.receive(KEY_STATE_ID, [0, 0])

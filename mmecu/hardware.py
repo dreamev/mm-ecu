@@ -9,6 +9,7 @@ import pwmio
 from adafruit_motor import servo
 
 from mmecu import log
+from mmecu.actions import VehicleActions
 from mmecu.app import LISTEN_IDS, Application
 from mmecu.battery import BatteryGauge
 from mmecu.controller import VehicleController
@@ -79,7 +80,7 @@ def build_gauge_servo():
     return servo.Servo(pwm, min_pulse=500, max_pulse=2500)
 
 
-def build_application(sleep=time.sleep):
+def build_application(sleep=time.sleep, clock=time.monotonic, actions=None):
     pad = Keypad()
     shifter = Shifter({state: output_pin(pin) for state, pin in SHIFT_RELAY_PINS.items()}, sleep)
     parking_brake = ParkingBrake(
@@ -88,6 +89,6 @@ def build_application(sleep=time.sleep):
         output_pin(BRAKE_ENGAGE_PIN),
         output_pin(BRAKE_DISENGAGE_PIN),
     )
-    controller = VehicleController(pad, shifter, parking_brake)
+    controller = VehicleController(pad, shifter, parking_brake, actions or VehicleActions(), clock)
     gauge = BatteryGauge(build_gauge_servo())
     return Application(CanBus(LISTEN_IDS), pad, controller, gauge)
