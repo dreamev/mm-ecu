@@ -34,10 +34,17 @@ flowchart LR
   auto-detected drive. Otherwise the tool tries `/Volumes/CIRCUITPY`,
   `/run/media/$USER/CIRCUITPY` and `/media/$USER/CIRCUITPY`.
 - It refuses any directory without `boot_out.txt`, so a typo'd path can't be written to.
-- Copies `lib/`, then replaces `mmecu/` wholesale. It removes `mmecu/` if the source
-  has none (the legacy layout), so switching layouts leaves no strays. It writes
-  `code.py` **last**, because that triggers CircuitPython's auto-reload.
-- Every written file is re-read and compared (sha256) with its source.
+- **Staged, never half-installed.** Everything is first copied into the hidden
+  `.mmecu-staging/` folder on the drive and verified (sha256). Any failure there (disk
+  full, unplugged, bad write) removes the staging folder and leaves the running firmware
+  untouched. Only then is it swapped in by renames: `lib/` files, the whole `mmecu/`
+  directory, and `code.py` **last**.
+- For the legacy layout (no `mmecu/` in the source), `code.py` is replaced *before*
+  `mmecu/` is removed, so the board never holds a `code.py` that imports a missing package.
+- CircuitPython auto-reloads after *any* write to the drive, not just `code.py`. While
+  staging, a reload only restarts the old, intact firmware.
+- Installed files are verified again after the swap. A leftover staging folder from an
+  interrupted run is removed on the next deploy.
 - Other drive files (client notes, `boot_out.txt`, hidden OS files) are never touched.
 - Limitation: files on the board that were never committed cannot be restored. Copy
   the drive to a folder by hand once before the first deploy on an unknown board.

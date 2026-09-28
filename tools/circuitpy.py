@@ -24,6 +24,7 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DRIVE_MARKER = "boot_out.txt"  # written by CircuitPython at every boot
 FIRMWARE_PACKAGE = "mmecu"
+STAGING = ".mmecu-staging"  # hidden: ignored by walk_files, never imported by CircuitPython
 RESTORE_REF = "v1.0.0"  # a release tag, never a branch (master moves on merge)
 SYSTEM_NAMES = {"System Volume Information", "$RECYCLE.BIN"}
 _USER = os.environ.get("USER", "")
@@ -115,26 +116,67 @@ def firmware_files(source):
 
 
 # --- deploy -------------------------------------------------------------------
-def deploy(drive, source=REPO):
-    """Install the firmware tree at `source` on the drive, then verify what was written.
+def _remove_tree(path):
+    shutil.rmtree(path)
 
-    mmecu/ on the drive is replaced wholesale (or removed if the source has none), so
-    switching between the package and the legacy single-file firmware leaves no strays.
-    Other files on the drive (lib extras, notes) are left alone.
+
+def _flush():
+    if hasattr(os, "sync"):
+        os.sync()
+
+
+def deploy(drive, source=REPO):
+    """Install the firmware tree at `source` on the drive without ever leaving it unbootable.
+
+    1. Copy everything into a hidden staging folder on the drive and verify it. Any
+       failure here leaves the running firmware untouched (staging is removed).
+    2. Swap in by renames: lib/ files, then the mmecu/ directory, then code.py last.
+       A source without mmecu/ (the legacy layout) gets code.py first, and mmecu/ is
+       removed only afterwards, so no code.py ever imports a missing package.
+    3. Verify the installed files.
+
+    CircuitPython auto-reloads after any write to the drive; during staging a reload
+    just restarts the old, intact firmware. Other files on the drive are left alone.
     """
     require_drive(drive)
     files = firmware_files(source)
+    staging = os.path.join(drive, STAGING)
+    if os.path.isdir(staging):
+        _remove_tree(staging)  # left over from an earlier interrupted deploy
+    try:
+        for source_path, rel in files:
+            _copy(source_path, os.path.join(staging, rel))
+        _flush()
+        for source_path, rel in files:
+            staged = os.path.join(staging, rel)
+            if not os.path.isfile(staged) or sha256(staged) != sha256(source_path):
+                raise DriveError(f"{rel} did not copy correctly; board unchanged, run the command again")
+    except BaseException:
+        if os.path.isdir(staging):
+            _remove_tree(staging)
+        raise
+
+    for _, rel in files:
+        if rel.startswith("lib/"):
+            os.makedirs(os.path.dirname(os.path.join(drive, rel)), exist_ok=True)
+            os.replace(os.path.join(staging, rel), os.path.join(drive, rel))
     package = os.path.join(drive, FIRMWARE_PACKAGE)
-    if os.path.isdir(package):
-        shutil.rmtree(package)
-    for source_path, rel in files:
-        _copy(source_path, os.path.join(drive, rel))
-    if hasattr(os, "sync"):
-        os.sync()
+    staged_package = os.path.join(staging, FIRMWARE_PACKAGE)
+    source_has_package = os.path.isdir(staged_package)  # decided before the swap moves it
+    if source_has_package:
+        if os.path.isdir(package):
+            os.rename(package, os.path.join(staging, "retired-" + FIRMWARE_PACKAGE))
+        os.rename(staged_package, package)
+    os.replace(os.path.join(staging, "code.py"), os.path.join(drive, "code.py"))
+    if not source_has_package and os.path.isdir(package):
+        _remove_tree(package)  # legacy firmware: its code.py is already in place
+    _remove_tree(staging)
+    _flush()
+
     for source_path, rel in files:
         target = os.path.join(drive, rel)
         if not os.path.isfile(target) or sha256(target) != sha256(source_path):
-            raise DriveError(f"{rel} did not write correctly; run the command again")
+            raise DriveError(f"{rel} is wrong after install; run the command again")
     return [rel for _, rel in files]
 
 
