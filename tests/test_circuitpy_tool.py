@@ -249,3 +249,47 @@ def test_swap_installs_lib_then_package_then_code_py_last(monkeypatch, drive):
     assert moves[-1] == "code.py"
     assert moves[-2] == "mmecu"
     assert all(move.startswith("lib/") for move in moves[:-2])
+
+
+# --- interrupted swap (second Copilot review r4126474697): roll back / self-heal ---
+def _fail_rename_into_package(monkeypatch):
+    real_rename = os.rename
+
+    def flaky(source, target):
+        if os.path.basename(target) == "mmecu" and os.path.basename(source) == "mmecu":  # the install rename only
+            raise OSError(5, "Input/output error")
+        real_rename(source, target)
+
+    monkeypatch.setattr(circuitpy.os, "rename", flaky)
+
+
+def test_error_between_the_swap_renames_rolls_back_to_the_previous_firmware(monkeypatch, drive):
+    circuitpy.deploy(drive)
+    before = _snapshot(drive)
+    _fail_rename_into_package(monkeypatch)
+    with pytest.raises(DriveError, match="previous firmware restored"):
+        circuitpy.deploy(drive)
+    assert _snapshot(drive) == before
+
+
+def test_next_run_repairs_a_swap_killed_between_the_renames(drive):
+    circuitpy.deploy(drive)
+    before = _snapshot(drive)
+    # what the drive looks like if the laptop died right after the first rename
+    staging = os.path.join(drive, circuitpy.STAGING)
+    os.makedirs(staging)
+    os.rename(os.path.join(drive, "mmecu"), os.path.join(staging, "retired-mmecu"))
+    assert circuitpy.repair_interrupted_swap(drive) is True
+    assert _snapshot(drive) == before  # bootable again, previous firmware
+    assert circuitpy.repair_interrupted_swap(drive) is False
+
+
+def test_deploy_and_restore_self_heal_first(capsys, drive, v1):
+    circuitpy.deploy(drive)
+    staging = os.path.join(drive, circuitpy.STAGING)
+    os.makedirs(staging)
+    os.rename(os.path.join(drive, "mmecu"), os.path.join(staging, "retired-mmecu"))
+    assert circuitpy.main(["--drive", drive, "restore", "--yes"]) == 0
+    assert "interrupted deploy" in capsys.readouterr().out
+    assert _read(drive, "code.py") == _git_show(v1, "code.py")
+    assert not os.path.exists(staging)

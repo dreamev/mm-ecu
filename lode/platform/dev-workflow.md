@@ -45,6 +45,17 @@ flowchart LR
   staging, a reload only restarts the old, intact firmware.
 - Installed files are verified again after the swap. A leftover staging folder from an
   interrupted run is removed on the next deploy.
+- **Residual swap windows (milliseconds, between renames), with how each recovers:**
+  - The old `mmecu/` is parked as `.mmecu-staging/retired-mmecu`, and the new one is not yet
+    renamed in. This is the only unbootable state. An error there is rolled back at once
+    (`previous firmware restored`). If the process died (unplug), the next
+    `deploy`/`restore` runs `repair_interrupted_swap` first and prints "Found an
+    interrupted deploy…".
+  - The new `mmecu/` is in place but `code.py` is still the previous one. It boots,
+    because `code.py` is only import, build and loop. Re-running completes it.
+  - A truly atomic switch would need versioned package folders plus a `code.py` that sets
+    `sys.path`. Rejected for now (2026-09-28): it changes the on-board layout, and the
+    windows above are recoverable.
 - Other drive files (client notes, `boot_out.txt`, hidden OS files) are never touched.
 - Limitation: files on the board that were never committed cannot be restored. Copy
   the drive to a folder by hand once before the first deploy on an unknown board.

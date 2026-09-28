@@ -125,6 +125,24 @@ def _flush():
         os.sync()
 
 
+RETIRED = "retired-" + FIRMWARE_PACKAGE  # previous package, parked inside staging during the swap
+
+
+def repair_interrupted_swap(drive):
+    """Put the previous package back if a swap died between its two renames.
+
+    The only unbootable state a swap can leave is: code.py importing mmecu/, no mmecu/,
+    and the previous package parked in staging. Returns True if it repaired that.
+    """
+    package = os.path.join(drive, FIRMWARE_PACKAGE)
+    retired = os.path.join(drive, STAGING, RETIRED)
+    if os.path.isdir(package) or not os.path.isdir(retired):
+        return False
+    os.rename(retired, package)
+    _flush()
+    return True
+
+
 def deploy(drive, source=REPO):
     """Install the firmware tree at `source` on the drive without ever leaving it unbootable.
 
@@ -140,6 +158,7 @@ def deploy(drive, source=REPO):
     """
     require_drive(drive)
     files = firmware_files(source)
+    repair_interrupted_swap(drive)
     staging = os.path.join(drive, STAGING)
     if os.path.isdir(staging):
         _remove_tree(staging)  # left over from an earlier interrupted deploy
@@ -165,8 +184,13 @@ def deploy(drive, source=REPO):
     source_has_package = os.path.isdir(staged_package)  # decided before the swap moves it
     if source_has_package:
         if os.path.isdir(package):
-            os.rename(package, os.path.join(staging, "retired-" + FIRMWARE_PACKAGE))
-        os.rename(staged_package, package)
+            os.rename(package, os.path.join(staging, RETIRED))
+        try:
+            os.rename(staged_package, package)
+        except OSError as error:
+            if repair_interrupted_swap(drive):
+                raise DriveError(f"swap failed ({error}); previous firmware restored, run the command again") from error
+            raise
     os.replace(os.path.join(staging, "code.py"), os.path.join(drive, "code.py"))
     if not source_has_package and os.path.isdir(package):
         _remove_tree(package)  # legacy firmware: its code.py is already in place
@@ -201,6 +225,8 @@ def main(argv=None):
 
     try:
         drive = find_drive(args.drive)
+        if repair_interrupted_swap(drive):
+            print("Found an interrupted deploy; put the previous firmware back in place first.")
         if args.command == "restore":
             if not args.yes:
                 answer = input(f"Replace the firmware on {drive} with git '{args.ref}'? [yes/no] ")
